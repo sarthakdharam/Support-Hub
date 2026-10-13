@@ -1,0 +1,72 @@
+
+# ==============================
+# Environment variables and secrets
+# ==============================
+.env
+.env.*
+!.env.example
+
+# ==============================
+# Dependencies
+# ==============================
+node_modules/
+**/node_modules/
+
+# ==============================
+# Seed files and seed data
+# ==============================
+seed/
+seeds/
+**/seed/
+**/seeds/
+**/*.seed.js
+**/*.seed.ts
+
+# ==============================
+# Logs
+# ==============================
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+
+# ==============================
+# Build output
+# ==============================
+dist/
+build/
+coverage/
+
+# ==============================
+# Runtime files
+# ==============================
+*.pid
+*.pid.lock
+
+# ==============================
+# IDE and editor files
+# ==============================
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ==============================
+# Operating system files
+# ==============================
+.DS_Store
+Thumbs.db
+
+# ==============================
+# Temporary files
+# ==============================
+tmp/
+temp/
+
+# ==============================
+# Local database and backups
+# ==============================
+*.sql
+*.dump
+*.backup
