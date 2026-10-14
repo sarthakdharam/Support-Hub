@@ -57,6 +57,10 @@ const Team_Member=new EntitySchema({
         profile_photo_mime: {
             type: 'varchar',
             nullable:true
+        },
+        active_tickets:{
+            type:'int',
+            default:0
         }
     },
     relations: {
@@ -69,6 +73,17 @@ const Team_Member=new EntitySchema({
             },
             nullable: true,
         },
+        tech_admin: {
+            type: 'many-to-one',
+            target: 'Tech_Admin',
+            joinColumn: {
+                name: 'tech_admin_id',
+                referencedColumnName: 'id',
+            },
+            onDelete:'SET NULL',
+            nullable:true
+        }
+           
     }
 })
 
