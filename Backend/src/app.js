@@ -1,10 +1,13 @@
 const express=require('express')
 const {AppDataSource}=require('./config/database')
 const {seedSuper_Admin}=require('./seed/super_Admin.seed')
-
+const {login}=require('./controller/login.controller')
 const app=express()
+require('dotenv').config();
 
 app.use(express.json())
+
+app.post('/api/login',login)
 
 async function start(){
     
