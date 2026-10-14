@@ -24,15 +24,15 @@ const Create_Tech_Admin=async (req,res)=>{
         }
 
         if(username.trim()===''){
-            return res.status(400).json({message:'there should be username'})
+            return res.status(400).json({message:'Enter username'})
         }
 
-        if(name.trim()===''){tech_admin.password=password
-            return res.status(400).json({message:'there should be name'})
+        if(name.trim()===''){
+            return res.status(400).json({message:'Enter name'})
         }
 
         if(email.trim()===''){
-            return res.status(400).json({message:'there should be email'})
+            return res.status(400).json({message:'Enter email'})
         }else{
             const emailPattern = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/
 
@@ -42,13 +42,13 @@ const Create_Tech_Admin=async (req,res)=>{
         }
 
         if(phone.trim()===''){
-            return res.status(400).json({message:'there should be phone no.'})
+            return res.status(400).json({message:'Enter phone no.'})
         }else if(!/^\d{10}$/.test(phone)){
             return res.status(400).json({message:'phone no. should be of 10 digit'})
         }
 
         if(password.trim()===''){
-            return res.status(400).json({message:'there should be password'})
+            return res.status(400).json({message:'Enter password'})
         }else{
             const passwordvalid = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&#^()_+\-=])[A-Za-z\d@$!%*?&#^()_+\-=]{8,}$/
 
@@ -58,11 +58,11 @@ const Create_Tech_Admin=async (req,res)=>{
         }
 
         if(branch.trim()===''){
-            return res.status(400).json({message:'there should be branch'})
+            return res.status(400).json({message:'Enter branch'})
         }
 
         if(address.trim()===''){
-            return res.status(400).json({message:'there should be address'})
+            return res.status(400).json({message:'Enter address'})
         }
         
 

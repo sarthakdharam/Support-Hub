@@ -3,18 +3,26 @@ const jwt=require('jsonwebtoken')
 function authenticate(req,res,next){
     const authHeader=req.headers.authorization
 
-    if(!authHeader){
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
         return res.status(401).json({
-             message:'Token required'
-        })
+            message: 'Bearer token required'
+        });
     }
-    const token=authHeader.split(" ")[1]
+
+    const token = authHeader.split(' ')[1];
+
+    if (!token) {
+        return res.status(401).json({
+            message: 'Token required'
+        });
+    }
+
     try{
         const decode=jwt.verify(token,process.env.JWT_SECRET)
         req.user=decode
         next()
     }catch(err){
-        return res.status(401).json({message:'Invalid Token'})
+        return res.status(401).json({message:'Invalid or expired token'})
     }
 }
 module.exports = { authenticate }
