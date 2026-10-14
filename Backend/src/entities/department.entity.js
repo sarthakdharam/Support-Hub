@@ -21,6 +21,10 @@ const Department=new EntitySchema({
         created_at:{
             type:'timestamp',
             createDate:true,
+        },
+        Responsibilities:{
+            type:'varchar',
+            nullable:false
         }
 
     }
