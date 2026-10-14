@@ -212,6 +212,10 @@ const Delete_Tech_Admin=async (req,res)=>{
             return res.status(404).json({message:'Tech Admin Not Found'})
         }
 
+        if (!tech_admin.is_active) {
+            return res.status(400).json({message: 'Tech Admin is already deactivated'});
+        }
+
         tech_admin.is_active=false
         await Tech_AdminRepository.save(tech_admin)
 
@@ -219,7 +223,7 @@ const Delete_Tech_Admin=async (req,res)=>{
 
     }catch(err){
         console.log(err)
-        return res.status(500).json({message:'Error While Updating Tech Admin', error: err.message})
+        return res.status(500).json({message:'Error While Deactivating Tech Admin', error: err.message})
     }
 }
 
@@ -234,6 +238,10 @@ const Activate_Tech_Admin=async (req,res)=>{
             return res.status(404).json({message:'Tech Admin Not Found'})
         }
 
+        if (tech_admin.is_active) {
+            return res.status(400).json({message: 'Team Member is already active'});
+        }
+
         tech_admin.is_active=true
         await Tech_AdminRepository.save(tech_admin)
 
@@ -241,7 +249,7 @@ const Activate_Tech_Admin=async (req,res)=>{
 
     }catch(err){
         console.log(err)
-        return res.status(500).json({message:'Error While Updating Tech Admin', error: err.message})
+        return res.status(500).json({message:'Error While Activating Tech Admin', error: err.message})
     }
 }
 
