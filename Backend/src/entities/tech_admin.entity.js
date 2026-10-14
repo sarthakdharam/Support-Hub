@@ -45,7 +45,7 @@ const Tech_Admin=new EntitySchema({
         },
         profile_photo:{
             type:'bytea',
-            nullable:false
+            nullable:true
         },
         created_at:{
             type:'timestamp',
@@ -61,7 +61,7 @@ const Tech_Admin=new EntitySchema({
         },
         profile_photo_mime: {
             type: 'varchar',
-            nullable:false
+            nullable:true
         }
 
     }
