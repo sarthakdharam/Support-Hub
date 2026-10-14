@@ -2,6 +2,7 @@ const {Tech_AdminRepository}=require('../repositories/tech_admin.repository')
 const {Super_AdminRepository}=require('../repositories/super_admin.repository')
 const {Team_MemberRepository}=require('../repositories/team_member.repository')
 const bcrypt=require('bcrypt')
+const { Not } = require('typeorm')
 
 
 const Create_Tech_Admin=async (req,res)=>{
@@ -26,7 +27,7 @@ const Create_Tech_Admin=async (req,res)=>{
             return res.status(400).json({message:'there should be username'})
         }
 
-        if(name.trim()===''){
+        if(name.trim()===''){tech_admin.password=password
             return res.status(400).json({message:'there should be name'})
         }
 
@@ -95,8 +96,153 @@ const Create_Tech_Admin=async (req,res)=>{
 
     }catch(err){
         console.log(err)
-        return res.status(500).json({message:'Error Creating User', error: err.message})
+        return res.status(500).json({message:'Error While Creating Tech Admin', error: err.message})
     }
 }
 
-module.exports={Create_Tech_Admin}
+const Get_Tech_Admin=async (req,res)=>{
+    try{
+
+        const tech_admin=await Tech_AdminRepository.find({
+            select:{
+                id:true,
+                username:true,
+                name:true,
+                email:true,
+                phone:true,
+                branch:true,
+                address:true,
+                is_active:true,
+                profile_photo:true,                
+            },
+            order:{
+                id:'ASC'
+            }
+        })
+        res.status(200).json(tech_admin)
+        
+    }catch(err){
+        console.log(err)
+        return res.status(500).json({message:'Error While Getting Tech Admin', error: err.message})
+    }
+}
+
+const Update_Tech_Admin=async (req,res)=>{
+    try{
+
+        const tech_admin_id=req.user.userId
+
+        const tech_admin=await Tech_AdminRepository.findOneBy({id:tech_admin_id})
+        
+        if(!tech_admin){
+            return res.status(404).json({message:'Tech Admin Not Found'})
+        }
+
+        const {name,email,phone,password,address}=req.body
+
+        const emailPattern = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/
+
+        if(email && !emailPattern.test(email.trim())){
+           return res.status(400).json({message:'Enter a valid email address'})
+        }
+
+        if(phone && !/^\d{10}$/.test(phone.trim())){
+            return res.status(400).json({message:'Phone number should be 10 digits'})
+        }
+        const passwordvalid = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&#^()_+\-=])[A-Za-z\d@$!%*?&#^()_+\-=]{8,}$/
+        if(password){
+            if(!passwordvalid.test(password)){
+                return res.status(400).json({message:'use 8+ character with Uppercase,Lowercase,Number and Special Character'})
+            }
+        }
+
+        const new_email = email?.trim().toLowerCase()
+        const new_phone = phone?.trim()
+
+        const conditions = []
+        if (new_email) conditions.push({ email: new_email })
+        if (new_phone) conditions.push({ phone: new_phone })
+
+        if (conditions.length > 0) {
+            const [team_member, other_admin] = await Promise.all([
+                Team_MemberRepository.findOne({ where: conditions }),
+                Tech_AdminRepository.findOne({
+                    where: conditions.map(c => ({ ...c, id: Not(tech_admin.id) }))
+                })
+            ])
+
+            if (team_member || other_admin) {
+                return res.status(409).json({ message: 'Email or phone number already exists' })
+            }
+        }
+
+
+
+        if(name) tech_admin.name=name
+        if(new_email) tech_admin.email=new_email
+        if(new_phone) tech_admin.phone=new_phone
+        if(password) {
+            tech_admin.password=await bcrypt.hash(password, 10)
+        }
+        if(address) tech_admin.address=address
+        if(req.file){
+            tech_admin.profile_photo=req.file.buffer
+            tech_admin.profile_photo_mime=req.file.mimetype
+        }
+
+        const updated_tech_admin=await Tech_AdminRepository.save(tech_admin)
+        const {password: _, ...tech_admin_without_password}=updated_tech_admin
+
+        res.status(200).json(tech_admin_without_password)
+
+    }catch(err){
+        console.log(err)
+        return res.status(500).json({message:'Error While Updating Tech Admin', error: err.message})
+    }
+}
+
+const Delete_Tech_Admin=async (req,res)=>{
+    try{
+
+        const {id}=req.params
+
+        const tech_admin=await Tech_AdminRepository.findOneBy({id})
+
+        if(!tech_admin){
+            return res.status(404).json({message:'Tech Admin Not Found'})
+        }
+
+        tech_admin.is_active=false
+        await Tech_AdminRepository.save(tech_admin)
+
+        res.status(200).json({message:`${tech_admin.name} has deactivated successfully`})
+
+    }catch(err){
+        console.log(err)
+        return res.status(500).json({message:'Error While Updating Tech Admin', error: err.message})
+    }
+}
+
+const Activate_Tech_Admin=async (req,res)=>{
+    try{
+
+        const {id}=req.params
+
+        const tech_admin=await Tech_AdminRepository.findOneBy({id})
+
+        if(!tech_admin){
+            return res.status(404).json({message:'Tech Admin Not Found'})
+        }
+
+        tech_admin.is_active=true
+        await Tech_AdminRepository.save(tech_admin)
+
+        res.status(200).json({message:`${tech_admin.name} has activated successfully`})
+
+    }catch(err){
+        console.log(err)
+        return res.status(500).json({message:'Error While Updating Tech Admin', error: err.message})
+    }
+}
+
+module.exports={Create_Tech_Admin,Get_Tech_Admin,Update_Tech_Admin,Delete_Tech_Admin,Activate_Tech_Admin}
