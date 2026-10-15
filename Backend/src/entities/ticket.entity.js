@@ -15,7 +15,7 @@ const Ticket = new EntitySchema({
         ticket_id: {
             type: 'int',
             unique: true,
-            generated: 'increment',
+            nullable:false
         },
 
         subject: {

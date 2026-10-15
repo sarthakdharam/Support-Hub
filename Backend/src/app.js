@@ -8,6 +8,7 @@ const {Create_Team_Member,Get_Team_Member,Update_Team_Member,Delete_Team_Member,
 const {Create_Department,Get_Department,Delete_Department,Activate_Department}=require('./controller/department.controller')
 const {authenticate}=require('./middleware/authentication.middleware')
 const {authorize}=require('./middleware/authorization.middleware')
+const { Create_Ticket, Get_Tickets } = require('./controller/ticket.controller')
 require('dotenv').config();
 
 app.use(express.json())
@@ -30,6 +31,9 @@ app.post('/api/department',authenticate,authorize(['super_admin']),Create_Depart
 app.get('/api/department',authenticate,authorize(['super_admin','tech_admin']),Get_Department)
 app.patch('/api/department/deactivate/:id',authenticate,authorize(['super_admin']),Delete_Department)
 app.patch('/api/department/activate/:id',authenticate,authorize(['super_admin']),Activate_Department)
+// Ticket
+app.post('/api/ticket',authenticate,authorize(['tech_admin']),Create_Ticket)
+app.get('/api/ticket',authenticate,authorize(['super_admin','tech_admin']),Get_Tickets)
 
 async function start(){
     
