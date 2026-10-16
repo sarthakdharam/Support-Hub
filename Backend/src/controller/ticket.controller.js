@@ -122,7 +122,6 @@ const Create_Ticket = async (req, res) => {
                 note: 'Ticket created',
                 ticket: { id: saved.id },
                 changed_by_admin: {id: tech_admin_id},
-                tech_admin: { id: tech_admin.id }
             });
 
             await tickethistoryRepo.save(history);
