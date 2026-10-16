@@ -34,14 +34,24 @@ const Ticket_History = new EntitySchema({
     },
 
     relations: {
-        changed_by: {
+        changed_by_member: {
             type: 'many-to-one',
             target: 'Team_Member',
             joinColumn: {
-                name: 'changed_by',
+                name: 'changed_by_member_id',
                 referencedColumnName: 'id',
             },
-            nullable: false,
+            nullable: true,
+        },
+
+        changed_by_admin: {
+            type: 'many-to-one',
+            target: 'Tech_Admin',
+            joinColumn: {
+                name: 'changed_by_admin_id',
+                referencedColumnName: 'id',
+            },
+            nullable: true,
         },
 
         ticket: {
