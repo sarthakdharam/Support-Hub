@@ -61,7 +61,7 @@ async function start(){
         await AppDataSource.initialize();
         console.log('Database connected .....')
         
-        seedSuper_Admin()
+        await seedSuper_Admin()
 
         app.listen(3000,()=>{
             console.log('Server running on http://localhost:3000')

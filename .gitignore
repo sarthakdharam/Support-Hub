@@ -19,6 +19,7 @@ node_modules/
 **/seeds/
 **/*.seed.js
 **/*.seed.ts
+!Backend/src/seed/
 
 # =========================
 # Logs
