@@ -199,6 +199,27 @@ const Get_Tickets = async (req, res) => {
 }
 
 
+const Get_My_Tickets = async (req, res) => {
+    try {
+        const ticket = await TicketRepository.find({
+            where: { team_member: { id: req.user.userId } },
+            select: {
+                id: true, ticket_id: true, subject: true, description: true,
+                status: true, priority: true, created_at: true, updated_at: true,
+                due_at: true, resolved_at: true,
+                department: { id: true, dept_name: true },
+                team_member: { id: true, name: true, username: true }
+            },
+            relations: { department: true, team_member: true },
+            order: { created_at: 'DESC' }
+        })
+        return res.status(200).json(ticket)
+    } catch (err) {
+        console.error(err)
+        return res.status(500).json({ message: 'Error While Getting Your Tickets' })
+    }
+}
+
 const Update_Ticket = async (req, res) => {
     try {
         const {ticket_id,edit_details,reassign,start_work,resolve,close} = req.body
@@ -649,4 +670,4 @@ const Update_Ticket = async (req, res) => {
     }
 }
 
-module.exports={Create_Ticket,Get_Tickets,Update_Ticket}
+module.exports={Create_Ticket,Get_Tickets,Get_My_Tickets,Update_Ticket}

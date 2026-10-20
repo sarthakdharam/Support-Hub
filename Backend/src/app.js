@@ -7,8 +7,9 @@ const {Create_Team_Member,Get_Team_Member,Update_Team_Member,Delete_Team_Member,
 const {Create_Department,Get_Department,Delete_Department,Activate_Department}=require('./controller/department.controller')
 const {authenticate}=require('./middleware/authentication.middleware')
 const {authorize}=require('./middleware/authorization.middleware')
-const { Create_Ticket, Get_Tickets, Update_Ticket } = require('./controller/ticket.controller')
+const { Create_Ticket, Get_Tickets, Get_My_Tickets, Update_Ticket } = require('./controller/ticket.controller')
 const { Get_Ticket_History } = require('./controller/ticket_history.controller')
+const { Refresh_Token } = require('./controller/refresh_token.controller')
 require('dotenv').config();
 const cors=require('cors')
 
@@ -23,6 +24,7 @@ app.use(cors({
 app.use(express.json())
 
 app.post('/api/login',login)
+app.post('/api/refresh-token',Refresh_Token)
 //TECH ADMIN
 app.post('/api/tech_admin',authenticate,authorize(['super_admin']),Create_Tech_Admin)
 app.get('/api/tech_admin',authenticate,authorize(['super_admin']),Get_Tech_Admin)
@@ -43,6 +45,7 @@ app.patch('/api/department/activate/:id',authenticate,authorize(['super_admin'])
 // TICKET
 app.post('/api/ticket',authenticate,authorize(['tech_admin']),Create_Ticket)
 app.get('/api/ticket',authenticate,authorize(['super_admin','tech_admin']),Get_Tickets)
+app.get('/api/my/tickets',authenticate,authorize(['team_member']),Get_My_Tickets)
 app.put('/api/ticket',authenticate,authorize(['tech_admin','team_member']),Update_Ticket)
 // TICKET HISTORY
 app.get('/api/tickethistory',authenticate,authorize(['super_admin','tech_admin']),Get_Ticket_History)
