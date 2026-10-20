@@ -2,7 +2,6 @@ const express=require('express')
 const {AppDataSource}=require('./config/database')
 const {seedSuper_Admin}=require('./seed/super_Admin.seed')
 const {login}=require('./controller/login.controller')
-const app=express()
 const {Create_Tech_Admin,Get_Tech_Admin, Update_Tech_Admin, Delete_Tech_Admin, Activate_Tech_Admin}=require('./controller/tech_admin.controller')
 const {Create_Team_Member,Get_Team_Member,Update_Team_Member,Delete_Team_Member,Activate_Team_Member}=require('./controller/team_member.controller')
 const {Create_Department,Get_Department,Delete_Department,Activate_Department}=require('./controller/department.controller')
@@ -11,6 +10,15 @@ const {authorize}=require('./middleware/authorization.middleware')
 const { Create_Ticket, Get_Tickets, Update_Ticket } = require('./controller/ticket.controller')
 const { Get_Ticket_History } = require('./controller/ticket_history.controller')
 require('dotenv').config();
+const cors=require('cors')
+
+const app=express()
+
+app.use(cors({
+    origin:'http://localhost:5174',
+    credentials:true
+}))
+
 
 app.use(express.json())
 

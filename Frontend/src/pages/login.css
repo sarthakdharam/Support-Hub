@@ -1,0 +1,154 @@
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    font-family: Arial, sans-serif;
+}
+
+.login-container {
+    display: flex;
+    min-height: 100vh;
+}
+
+.left-container {
+    width: 50%;
+    background-color: #3498db;
+    color: white;
+    padding: 50px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+.left-container h1 {
+    font-size: 36px;
+    margin-bottom: 15px;
+    margin-left: 30px;
+}
+
+.left-container p {
+    line-height: 1.6;
+    color: #d6d9f4;
+    margin-left: 30px;
+}
+
+.login-logo {
+    width: 180px;
+    height: auto;
+    margin-top: 30px;
+    border-radius: 8px;
+    margin-left: 30px;
+}
+
+.right-container {
+    width: 50%;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    padding: 40px;
+}
+
+.right-container h2 {
+    color: #171e50;
+    margin-bottom: 25px;
+}
+
+.right-container form {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    width: 100%;
+    max-width: 350px;
+}
+
+.right-container input {
+    padding: 13px;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    font-size: 15px;
+}
+
+.right-container input:focus {
+    outline: none;
+    border-color: #4f46e5;
+}
+
+.right-container button {
+    padding: 13px;
+    background-color: #4f46e5;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    font-size: 15px;
+    cursor: pointer;
+}
+
+.right-container button:hover {
+    background-color: #3730a3;
+}
+
+.right-container button:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+}
+
+@media (max-width: 768px) {
+    .login-container {
+        flex-direction: column;
+    }
+
+    .left-container,
+    .right-container {
+        width: 100%;
+    }
+
+    .left-container {
+        padding: 35px 25px;
+    }
+
+    .left-container h1 {
+        font-size: 28px;
+    }
+
+    .login-logo {
+        width: 100px;
+    }
+
+    .right-container {
+        padding: 40px 25px;
+    }
+}
+
+.right-container h2 {
+    color: #171e50;
+    font-size: 30px;
+    margin: 0 0 10px;
+}
+
+.login-subtitle {
+    color: #777;
+    font-size: 14px;
+    margin: 0 0 30px;
+}
+
+.right-container form {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    width: 100%;
+    max-width: 350px;
+}
+
+.right-container label {
+    font-size: 14px;
+    font-weight: 600;
+    margin-top: 8px;
+}
+
+.right-container input {
+    margin-bottom: 5px;
+}
