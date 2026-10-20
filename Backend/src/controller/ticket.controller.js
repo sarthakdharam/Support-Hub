@@ -32,7 +32,7 @@ const Create_Ticket = async (req, res) => {
             return res.status(400).json({ message: 'Enter Description' })
         }
         if (!department.trim()){
-            res.status(400).json({ message: 'Select Department' })
+            return res.status(400).json({ message: 'Select Department' })
         }
         if (!member.trim()) {
             return res.status(400).json({ message: 'Select Member' })
@@ -150,7 +150,11 @@ const Create_Ticket = async (req, res) => {
 
 const Get_Tickets = async (req, res) => {
     try {
+        const where = req.user.role === 'tech_admin'
+            ? { tech_admin: { id: req.user.userId } }
+            : undefined
         const ticket = await TicketRepository.find({
+            ...(where ? { where } : {}),
             select: {
                 id: true,
                 ticket_id: true,
@@ -323,7 +327,8 @@ const Update_Ticket = async (req, res) => {
                     where: { id: lockedTicket.id },
                     relations: {
                         team_member: true,
-                        department: true
+                        department: true,
+                        tech_admin: true
                     }
                 })
 
@@ -332,6 +337,10 @@ const Update_Ticket = async (req, res) => {
                 }
 
                 const isActive = ACTIVE_TICKET_STATUSES.includes(ticket.status)
+
+                if (reassign && ticket.tech_admin?.id !== userId) {
+                    throw new Error('Not_Ticket_Owner')
+                }
 
                 if (edit_details) {
                     if (!ticket.team_member || ticket.team_member.id !== userId) {
@@ -599,6 +608,7 @@ const Update_Ticket = async (req, res) => {
     } catch (err) {
         const errors = {
             Ticket_Not_Found: [404, 'Ticket not found'],
+            Not_Ticket_Owner: [403, 'You can only reassign tickets created by your account'],
             Not_Assigned_To_Member: [
                 403,
                 'You can only update tickets assigned to you'

@@ -3,6 +3,7 @@ const {Super_AdminRepository}=require('../repositories/super_admin.repository')
 const {Team_MemberRepository}=require('../repositories/team_member.repository')
 const bcrypt=require('bcrypt')
 const { Not } = require('typeorm')
+const { readProfilePhoto } = require('../utils/profile_photo')
 
 
 const Create_Tech_Admin=async (req,res)=>{
@@ -113,7 +114,6 @@ const Get_Tech_Admin=async (req,res)=>{
                 branch:true,
                 address:true,
                 is_active:true,
-                profile_photo:true,                
             },
             order:{
                 id:'ASC'
@@ -185,9 +185,12 @@ const Update_Tech_Admin=async (req,res)=>{
             tech_admin.password=await bcrypt.hash(password, 10)
         }
         if(address) tech_admin.address=address
-        if(req.file){
-            tech_admin.profile_photo=req.file.buffer
-            tech_admin.profile_photo_mime=req.file.mimetype
+        const profilePhoto = req.file
+            ? { buffer: req.file.buffer, mime: req.file.mimetype }
+            : readProfilePhoto(req.body.profile_photo_data_url)
+        if(profilePhoto){
+            tech_admin.profile_photo=profilePhoto.buffer
+            tech_admin.profile_photo_mime=profilePhoto.mime
         }
 
         const updated_tech_admin=await Tech_AdminRepository.save(tech_admin)
@@ -197,6 +200,9 @@ const Update_Tech_Admin=async (req,res)=>{
 
     }catch(err){
         console.log(err)
+        if (err.message?.startsWith('Profile photo')) {
+            return res.status(400).json({ message: err.message })
+        }
         return res.status(500).json({message:'Error While Updating Tech Admin', error: err.message})
     }
 }

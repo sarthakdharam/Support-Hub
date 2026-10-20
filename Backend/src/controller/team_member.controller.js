@@ -4,6 +4,7 @@ const {Team_MemberRepository}=require('../repositories/team_member.repository')
 const {DepartmentRepository}=require('../repositories/department.repository')
 const bcrypt=require('bcrypt')
 const { Not } = require('typeorm')
+const { readProfilePhoto } = require('../utils/profile_photo')
 
 
 const Create_Team_Member=async (req,res)=>{
@@ -79,7 +80,7 @@ const Create_Team_Member=async (req,res)=>{
                 message:'Username, email, or phone number already exists'
             })
         }
-        const dept=await DepartmentRepository.findOneBy({dept_name:department})
+        const dept=await DepartmentRepository.findOneBy({dept_name:department, is_active:true})
 
         if(!dept){
             console.log('Department name should from department')
@@ -114,7 +115,11 @@ const Create_Team_Member=async (req,res)=>{
 const Get_Team_Member=async (req,res)=>{
     try{
 
+        const where = req.user.role === 'tech_admin'
+            ? { tech_admin: { id: req.user.userId } }
+            : undefined
         const team_member=await Team_MemberRepository.find({
+            ...(where ? { where } : {}),
             select:{
                 id:true,
                 username:true,
@@ -123,7 +128,7 @@ const Get_Team_Member=async (req,res)=>{
                 phone:true,
                 address:true,
                 is_active:true,
-                profile_photo:true,                
+                active_tickets:true,
             },
             relations:{
                 department:true
@@ -198,9 +203,12 @@ const Update_Team_Member=async (req,res)=>{
             team_member.password=await bcrypt.hash(password, 10)
         }
         if(address) team_member.address=address
-        if(req.file){
-            team_member.profile_photo=req.file.buffer
-            team_member.profile_photo_mime=req.file.mimetype
+        const profilePhoto = req.file
+            ? { buffer: req.file.buffer, mime: req.file.mimetype }
+            : readProfilePhoto(req.body.profile_photo_data_url)
+        if(profilePhoto){
+            team_member.profile_photo=profilePhoto.buffer
+            team_member.profile_photo_mime=profilePhoto.mime
         }
 
         const updated_team_member=await Team_MemberRepository.save(team_member)
@@ -210,6 +218,9 @@ const Update_Team_Member=async (req,res)=>{
 
     }catch(err){
         console.log(err)
+        if (err.message?.startsWith('Profile photo')) {
+            return res.status(400).json({ message: err.message })
+        }
         return res.status(500).json({message:'Error While Updating Team Member', error: err.message})
     }
 }

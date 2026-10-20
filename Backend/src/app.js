@@ -8,8 +8,9 @@ const {Create_Department,Get_Department,Delete_Department,Activate_Department}=r
 const {authenticate}=require('./middleware/authentication.middleware')
 const {authorize}=require('./middleware/authorization.middleware')
 const { Create_Ticket, Get_Tickets, Get_My_Tickets, Update_Ticket } = require('./controller/ticket.controller')
-const { Get_Ticket_History } = require('./controller/ticket_history.controller')
+const { Get_Ticket_History, Get_My_Ticket_History } = require('./controller/ticket_history.controller')
 const { Refresh_Token } = require('./controller/refresh_token.controller')
+const { Get_My_Profile } = require('./controller/profile.controller')
 require('dotenv').config();
 const cors=require('cors')
 
@@ -21,10 +22,11 @@ app.use(cors({
 }))
 
 
-app.use(express.json())
+app.use(express.json({ limit: '3mb' }))
 
 app.post('/api/login',login)
 app.post('/api/refresh-token',Refresh_Token)
+app.get('/api/profile',authenticate,authorize(['tech_admin','team_member']),Get_My_Profile)
 //TECH ADMIN
 app.post('/api/tech_admin',authenticate,authorize(['super_admin']),Create_Tech_Admin)
 app.get('/api/tech_admin',authenticate,authorize(['super_admin']),Get_Tech_Admin)
@@ -33,7 +35,7 @@ app.patch('/api/tech_admin/deactivate/:id',authenticate,authorize(['super_admin'
 app.patch('/api/tech_admin/activate/:id',authenticate,authorize(['super_admin']),Activate_Tech_Admin)
 //TEAM MEMBER
 app.post('/api/team_member',authenticate,authorize(['tech_admin']),Create_Team_Member)
-app.get('/api/team_member',authenticate,authorize(['tech_admin']),Get_Team_Member)
+app.get('/api/team_member',authenticate,authorize(['super_admin','tech_admin']),Get_Team_Member)
 app.patch('/api/team_member',authenticate,authorize(['team_member']),Update_Team_Member)
 app.patch('/api/team_member/deactivate/:id',authenticate,authorize(['tech_admin']),Delete_Team_Member)
 app.patch('/api/team_member/activate/:id',authenticate,authorize(['tech_admin']),Activate_Team_Member)
@@ -49,6 +51,7 @@ app.get('/api/my/tickets',authenticate,authorize(['team_member']),Get_My_Tickets
 app.put('/api/ticket',authenticate,authorize(['tech_admin','team_member']),Update_Ticket)
 // TICKET HISTORY
 app.get('/api/tickethistory',authenticate,authorize(['super_admin','tech_admin']),Get_Ticket_History)
+app.get('/api/my/tickethistory',authenticate,authorize(['team_member']),Get_My_Ticket_History)
 
 
 
