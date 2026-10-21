@@ -5,10 +5,12 @@ import "react-toastify/dist/ReactToastify.css"
 import Super_admin_dashboard from "./pages/super_admin/super_admin_dashboard"
 import Tech_admin_dashboard from "./pages/tech_admin/tech_admin_dashboard"
 import Team_member_dashboard from "./pages/team_member/team_member_dashboard"
+import LanguageSwitcher from "./components/LanguageSwitcher"
+import { LocaleProvider } from "./i18n"
 
 function App() {
     return (
-        <>
+        <LocaleProvider>
             <Routes>
                 <Route path="/" element={<Login />} />
                 <Route path="/login" element={<Login />} />
@@ -33,7 +35,8 @@ function App() {
                 position="top-right"
                 autoClose={3000}
             />
-        </>
+            <LanguageSwitcher />
+        </LocaleProvider>
     )
 }
 

@@ -1,8 +1,10 @@
 import { useState } from "react"
 import { toast } from "react-toastify"
 import { useNavigate } from "react-router-dom"
+import { useLocale } from "../i18n"
 import logo from "../assets/logo.png"
 import "./login.css"
+import { Eye, EyeOff } from 'lucide-react';
 
 const API_URL = "http://localhost:3000/api"
 
@@ -13,6 +15,7 @@ function Login() {
     const [isSubmitting, setIsSubmitting] = useState(false)
     const [fieldErrors, setFieldErrors] = useState({})
     const navigate = useNavigate()
+    const { t } = useLocale()
 
     async function handleSubmit(event) {
         event.preventDefault()
@@ -76,15 +79,15 @@ function Login() {
                     <span className="login-brand-copy"><strong>SupportHub</strong><small>SUPPORT OPERATIONS</small></span>
                 </div>
                 <div className="login-hero-copy">
-                    <div className="login-eyebrow"><i /> ONE WORKSPACE, EVERY REQUEST</div>
-                    <h1>Support work,<br />kept moving.</h1>
-                    <p>Bring tickets, teams, and updates together so every request has a clear next step.</p>
+                    <div className="login-eyebrow"><i /> {t("ONE WORKSPACE, EVERY REQUEST")}</div>
+                    <h1>{t("Support work,")}<br />{t("kept moving.")}</h1>
+                    <p>{t("Bring tickets, teams, and updates together so every request has a clear next step.")}</p>
                     <div className="login-workflow" aria-label="Support workflow">
                         <span className="workflow-node">01</span><span className="workflow-line" />
                         <span className="workflow-node">02</span><span className="workflow-line" />
                         <span className="workflow-node">03</span>
                     </div>
-                    <div className="login-workflow-labels"><span>Report</span><span>Assign</span><span>Resolve</span></div>
+                    <div className="login-workflow-labels"><span>{t("Report")}</span><span>{t("Assign")}</span><span>{t("Resolve")}</span></div>
                 </div>
                 <div className="login-hero-footer"><span>SUPPORTHUB</span><span>Tickets · People · Solutions</span></div>
             </section>
@@ -92,13 +95,13 @@ function Login() {
             <section className="login-form-side">
                 <div className="login-card">
                     <div className="login-card-mark" aria-hidden="true">S</div>
-                    <p className="login-card-kicker">WELCOME BACK</p>
-                    <h2>Sign in to SupportHub</h2>
-                    <p className="login-subtitle">Use the account details provided by your administrator.</p>
+                    <p className="login-card-kicker">{t("WELCOME BACK")}</p>
+                    <h2>{t("Sign in to SupportHub")}</h2>
+                    <p className="login-subtitle">{t("Use the account details provided by your administrator.")}</p>
 
                     <form noValidate onSubmit={handleSubmit}>
                         <div className="login-field">
-                            <label htmlFor="username">Username</label>
+                            <label htmlFor="username">{t("Username")}</label>
                             <div className={`login-input-wrap${fieldErrors.username ? " has-error" : ""}`}>
                                 <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.5"/><path d="M5 20c.6-3.4 3-5.2 7-5.2s6.4 1.8 7 5.2"/></svg>
                                 <input
@@ -107,7 +110,7 @@ function Login() {
                                     value={username}
                                     onChange={event => { setUsername(event.target.value); setFieldErrors(errors => ({ ...errors, username: undefined })) }}
                                     aria-invalid={Boolean(fieldErrors.username)}
-                                    placeholder="Enter your username"
+                                    placeholder={t("Enter your username")}
                                     autoComplete="username"
                                     autoCapitalize="none"
                                     required
@@ -117,7 +120,7 @@ function Login() {
                         </div>
 
                         <div className="login-field">
-                            <label htmlFor="password">Password</label>
+                            <label htmlFor="password">{t("Password")}</label>
                             <div className={`login-input-wrap${fieldErrors.password ? " has-error" : ""}`}>
                                 <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10" width="14" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>
                                 <input
@@ -127,23 +130,23 @@ function Login() {
                                     value={password}
                                     onChange={event => { setPassword(event.target.value); setFieldErrors(errors => ({ ...errors, password: undefined })) }}
                                     aria-invalid={Boolean(fieldErrors.password)}
-                                    placeholder="Enter your password"
+                                    placeholder={t("Enter your password")}
                                     autoComplete="current-password"
                                     required
                                 />
-                                <button className="login-show-password" type="button" onClick={() => setShowPassword(value => !value)} aria-label={showPassword ? "Hide password" : "Show password"}>
-                                    {showPassword ? "Hide" : "Show"}
+                                <button className="login-show-password" type="button" onClick={() => setShowPassword(value => !value)} aria-label={t(showPassword ? "Hide password" : "Show password")}>
+                                    {t(showPassword ? <Eye style={{padding:'2px'}}/> : <EyeOff style={{padding:'2px'}}/>)}
                                 </button>
                             </div>
                             {fieldErrors.password && <span className="login-field-error">{fieldErrors.password}</span>}
                         </div>
 
                         <button className="login-submit" type="submit" disabled={isSubmitting}>
-                            {isSubmitting ? <><span className="login-spinner" />Signing you in…</> : <>Sign in <span aria-hidden="true">→</span></>}
+                            {isSubmitting ? <><span className="login-spinner" />{t("Signing you in…")}</> : <>{t("Sign in")} <span aria-hidden="true">→</span></>}
                         </button>
                     </form>
 
-                    <div className="login-secure-note"><span aria-hidden="true">⌑</span> Secure access for your support team</div>
+                    <div className="login-secure-note"><span aria-hidden="true">⌑</span> {t("Secure access for your support team")}</div>
                 </div>
                 <div className="login-mobile-brand">SUPPORTHUB <span>·</span> TICKETS · PEOPLE · SOLUTIONS</div>
             </section>

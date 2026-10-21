@@ -6,6 +6,7 @@ const {Team_MemberRepository}=require('../repositories/team_member.repository')
 const {Team_Member}=require('../entities/team_member.entity')
 const {Ticket}=require('../entities/ticket.entity')
 const {Ticket_History}=require('../entities/ticket_history.entity')
+const {Notification}=require('../entities/notification.entity')
 
 const ALLOWED_PRIORITIES = ['Low', 'Medium', 'High']
 const ACTIVE_TICKET_STATUSES = ['Open', 'In Progress']  
@@ -94,6 +95,7 @@ const Create_Ticket = async (req, res) => {
             const teamMemberRepo = manager.getRepository(Team_Member)
             const ticketRepo = manager.getRepository(Ticket)
             const tickethistoryRepo =manager.getRepository(Ticket_History)
+            const notificationRepo = manager.getRepository(Notification)
 
             const team_member = await teamMemberRepo.findOne({
                 where: { id: member, is_active: true, department: { id: dept.id } },
@@ -138,6 +140,12 @@ const Create_Ticket = async (req, res) => {
             });
 
             await tickethistoryRepo.save(history);
+
+            await notificationRepo.save(notificationRepo.create({
+                message: `New ticket #${saved.ticket_id} has been assigned to you: ${saved.subject}`,
+                ticket_id: saved.ticket_id,
+                member: { id: team_member.id }
+            }))
 
             team_member.active_tickets += 1;
             await teamMemberRepo.save(team_member);
@@ -419,6 +427,7 @@ const Update_Ticket = async (req, res) => {
                 const ticketRepo = manager.getRepository(Ticket)
                 const teamMemberRepo = manager.getRepository(Team_Member)
                 const historyRepo = manager.getRepository(Ticket_History)
+                const notificationRepo = manager.getRepository(Notification)
 
                 const lockedTicket = await ticketRepo
                     .createQueryBuilder('ticket')
@@ -564,6 +573,12 @@ const Update_Ticket = async (req, res) => {
                     })
 
                     await historyRepo.save(history)
+
+                    await notificationRepo.save(notificationRepo.create({
+                        message: `Ticket #${savedTicket.ticket_id} has been assigned to you: ${savedTicket.subject}`,
+                        ticket_id: savedTicket.ticket_id,
+                        member: { id: lockedNewMember.id }
+                    }))
 
                     return savedTicket
                 }

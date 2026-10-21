@@ -11,6 +11,7 @@ const { Create_Ticket, Get_Tickets, Get_My_Tickets, Update_Ticket, Delete_Ticket
 const { Get_Ticket_History, Get_My_Ticket_History } = require('./controller/ticket_history.controller')
 const { Refresh_Token } = require('./controller/refresh_token.controller')
 const { Get_My_Profile } = require('./controller/profile.controller')
+const { Get_My_Notifications, Mark_Notification_Read } = require('./controller/notification.controller')
 require('dotenv').config();
 const cors=require('cors')
 
@@ -27,6 +28,8 @@ app.use(express.json({ limit: '3mb' }))
 app.post('/api/login',login)
 app.post('/api/refresh-token',Refresh_Token)
 app.get('/api/profile',authenticate,authorize(['tech_admin','team_member']),Get_My_Profile)
+app.get('/api/notifications',authenticate,authorize(['team_member']),Get_My_Notifications)
+app.patch('/api/notifications/:id/read',authenticate,authorize(['team_member']),Mark_Notification_Read)
 //TECH ADMIN
 app.post('/api/tech_admin',authenticate,authorize(['super_admin']),Create_Tech_Admin)
 app.get('/api/tech_admin',authenticate,authorize(['super_admin']),Get_Tech_Admin)

@@ -1,7 +1,9 @@
-import { Fragment, useCallback, useEffect, useMemo, useState } from "react"
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { createPortal } from "react-dom"
 import { useNavigate } from "react-router-dom"
 import { toast } from "react-toastify"
 import { apiFetch } from "../api"
+import { useLocale } from "../i18n"
 import logo from "../assets/logo.png"
 import "./support-dashboard.css"
 
@@ -10,6 +12,71 @@ const menus = {
     super_admin: ["Dashboard", "Departments", "Tech admins", "Team members", "All tickets", "Ticket history"],
     tech_admin: ["Dashboard", "All tickets", "Team members", "Departments", "Ticket history"],
     team_member: ["Dashboard", "My tickets", "Ticket history"]
+}
+
+function NotificationBell({ onOpenTickets }) {
+    const [notifications, setNotifications] = useState([])
+    const [isOpen, setIsOpen] = useState(false)
+    const knownIds = useRef(new Set())
+    const hasLoaded = useRef(false)
+    const unreadCount = notifications.filter(notification => !notification.read_at).length
+
+    useEffect(() => {
+        let active = true
+        async function refreshNotifications() {
+            try {
+                const response = await apiFetch("notifications")
+                const result = await response.json().catch(() => ({}))
+                if (!response.ok) throw new Error(result.message || "Could not load notifications")
+                if (!active) return
+
+                const latest = result.notifications || []
+                if (hasLoaded.current) {
+                    latest.filter(item => !knownIds.current.has(item.id)).reverse().forEach(item => {
+                        toast.info(item.message, { toastId: `ticket-notification-${item.id}` })
+                    })
+                }
+                latest.forEach(item => knownIds.current.add(item.id))
+                hasLoaded.current = true
+                setNotifications(latest)
+            } catch (error) {
+                if (active) console.error(error)
+            }
+        }
+
+        void refreshNotifications()
+        const interval = window.setInterval(refreshNotifications, 12000)
+        return () => {
+            active = false
+            window.clearInterval(interval)
+        }
+    }, [])
+
+    async function openNotification(notification) {
+        setIsOpen(false)
+        if (!notification.read_at) {
+            try {
+                const response = await apiFetch(`notifications/${notification.id}/read`, { method: "PATCH" })
+                const result = await response.json().catch(() => ({}))
+                if (!response.ok) throw new Error(result.message || "Could not mark notification as read")
+                setNotifications(current => current.map(item => item.id === notification.id ? { ...item, read_at: result.read_at } : item))
+            } catch (error) {
+                toast.error(error.message)
+            }
+        }
+        onOpenTickets()
+    }
+
+    return <div className="sh-notification-wrap">
+        <button type="button" className="sh-notification-button" aria-label={`Notifications${unreadCount ? `, ${unreadCount} unread` : ""}`} aria-haspopup="dialog" aria-expanded={isOpen} onClick={() => setIsOpen(value => !value)}>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 9a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></svg>
+            {unreadCount > 0 && <span className="sh-notification-count">{unreadCount > 9 ? "9+" : unreadCount}</span>}
+        </button>
+        {isOpen && <section className="sh-notification-menu" role="dialog" aria-label="Notifications">
+            <div className="sh-notification-heading"><div><strong>Notifications</strong><small>{unreadCount ? `${unreadCount} unread` : "You’re all caught up"}</small></div><button type="button" aria-label="Close notifications" onClick={() => setIsOpen(false)}>×</button></div>
+            <div className="sh-notification-list">{notifications.length ? notifications.map(notification => <button type="button" key={notification.id} className={`sh-notification-item${notification.read_at ? " is-read" : " is-unread"}`} onClick={() => openNotification(notification)}><span className="sh-notification-dot"/><span className="sh-notification-copy"><strong>{notification.ticket_id ? `Ticket #${notification.ticket_id} assigned` : "Ticket update"}</strong><span>{notification.message}</span><small>{new Date(notification.created_at).toLocaleString()}</small></span></button>) : <p className="sh-notification-empty">No ticket notifications yet.</p>}</div>
+        </section>}
+    </div>
 }
 
 
@@ -115,6 +182,7 @@ function fieldForError(section, message) {
 
 function SupportDashboard({ role }) {
     const navigate = useNavigate()
+    const { t } = useLocale()
     const token = localStorage.getItem("accessToken")
     const [section, setSection] = useState("Dashboard")
     const [tickets, setTickets] = useState([])
@@ -131,6 +199,8 @@ function SupportDashboard({ role }) {
     const [openFilter, setOpenFilter] = useState("")
     const [fieldErrors, setFieldErrors] = useState({})
     const [formOpen, setFormOpen] = useState(false)
+    const [ticketFormOpen, setTicketFormOpen] = useState(false)
+    const [teamMemberFormOpen, setTeamMemberFormOpen] = useState(false)
     const [createMenuOpen, setCreateMenuOpen] = useState(false)
     const [profileMenuOpen, setProfileMenuOpen] = useState(false)
     const [profileEditOpen, setProfileEditOpen] = useState(false)
@@ -271,6 +341,8 @@ function SupportDashboard({ role }) {
             const result = await response.json().catch(() => ({}))
             if (!response.ok) throw new Error(result.message || "Could not save changes")
             setFormOpen(false)
+            setTicketFormOpen(false)
+            setTeamMemberFormOpen(false)
             setProfileEditOpen(false)
             toast.success(formSection === "My profile" ? "Your profile was updated." : `${formSection === "Create ticket" ? "Ticket" : formSection === "Departments" ? "Department" : formSection === "Tech admins" ? "Tech admin" : "Team member"} created successfully.`)
             await load()
@@ -291,33 +363,49 @@ function SupportDashboard({ role }) {
         setSection(nextSection)
         setFormOpen(nextSection === "Create ticket")
     }
+    function closeEntryForm() {
+        setFormOpen(false)
+        if (section === "Create ticket") setSection("Dashboard")
+    }
 
     const recent = [...tickets].slice(0, 6)
     const rows = section === "My tickets" ? filtered : filtered
 
     return <div className={`sh-app${sidebarCollapsed ? " sidebar-collapsed" : ""}`}>
         <aside id="support-sidebar" className={`sh-sidebar${sidebarCollapsed ? " collapsed" : ""}${mobileSidebarOpen ? " show" : ""}`}>
-            <nav>{menus[role].map(name => <button key={name} className={section === name ? "active" : ""} title={sidebarCollapsed ? name : undefined} onClick={() => { selectSection(name); setMobileSidebarOpen(false) }}><span className="sh-nav-icon"><NavIcon name={name} /></span><span className="sh-nav-text">{name}</span></button>)}</nav>
-            <button className="sh-logout" onClick={logout}><span className="sh-nav-icon"><NavIcon name="Log out" /></span><span className="sh-nav-text">Log out</span></button>
+            <nav>{menus[role].map(name => <button key={name} className={section === name ? "active" : ""} title={sidebarCollapsed ? t(name) : undefined} onClick={() => { selectSection(name); setMobileSidebarOpen(false) }}><span className="sh-nav-icon"><NavIcon name={name} /></span><span className="sh-nav-text">{t(name)}</span></button>)}</nav>
+            <button className="sh-logout" onClick={logout}><span className="sh-nav-icon"><NavIcon name="Log out" /></span><span className="sh-nav-text">{t("Log out")}</span></button>
         </aside>
         <main className={`sh-main${sidebarCollapsed ? " sh-main-collapsed" : ""}`}>
-            <header className="sh-topbar"><button className="sh-mobile-menu" aria-label={window.matchMedia("(max-width: 800px)").matches ? (mobileSidebarOpen ? "Close navigation" : "Open navigation") : (sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar")} aria-controls="support-sidebar" aria-expanded={window.matchMedia("(max-width: 800px)").matches ? mobileSidebarOpen : !sidebarCollapsed} onClick={toggleSidebar}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16" /></svg></button><div className="sh-crumb">{title}</div><div className="sh-account">{role === "super_admin" ? <div className="sh-account-identity"><span className="sh-avatar">SA</span><span className="sh-account-name">Admin<small>Super Admin</small></span></div> : <><button className="sh-profile-trigger" aria-haspopup="dialog" aria-expanded={profileMenuOpen} onClick={() => setProfileMenuOpen(value => !value)}><span className="sh-avatar">{profile?.profile_photo_data_url ? <img src={profile.profile_photo_data_url} alt="" /> : (profile?.name || profile?.username || roleLabels[role])[0]}</span><span className="sh-account-name">{profile?.name || profile?.username || roleLabels[role]}<small>{roleLabels[role]}</small></span><span className="sh-caret">⌄</span></button>{profileMenuOpen && <div className="sh-profile-menu" role="dialog" aria-label="Your profile"><div className="sh-profile-menu-heading"><b>{profile?.name || profile?.username || roleLabels[role]}</b><span>{roleLabels[role]}</span></div><dl><dt>Email</dt><dd>{profile?.email || "Not added"}</dd><dt>Phone</dt><dd>{profile?.phone || "Not added"}</dd>{profile?.department?.dept_name && <><dt>Department</dt><dd>{profile.department.dept_name}</dd></>}</dl><button className="sh-primary" onClick={() => { setProfileMenuOpen(false); setProfileEditOpen(true) }}>Edit profile</button></div>}</>}</div></header>
+            <header className="sh-topbar">
+                <button className="sh-mobile-menu" aria-label={window.matchMedia("(max-width: 800px)").matches ? (mobileSidebarOpen ? "Close navigation" : "Open navigation") : (sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar")} aria-controls="support-sidebar" aria-expanded={window.matchMedia("(max-width: 800px)").matches ? mobileSidebarOpen : !sidebarCollapsed} onClick={toggleSidebar}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16" /></svg></button>
+                <div className="sh-crumb">{t(title)}</div>
+                <div className="sh-account">
+                    {role === "team_member" && <NotificationBell onOpenTickets={() => { setSection("My tickets"); setFormOpen(false) }} />}
+                    {role === "super_admin" ? <div className="sh-account-identity"><span className="sh-avatar">SA</span><span className="sh-account-name">Admin<small>Super Admin</small></span></div> : <>
+                        <button className="sh-profile-trigger" aria-haspopup="dialog" aria-expanded={profileMenuOpen} onClick={() => setProfileMenuOpen(value => !value)}><span className="sh-avatar">{profile?.profile_photo_data_url ? <img src={profile.profile_photo_data_url} alt="" /> : (profile?.name || profile?.username || roleLabels[role])[0]}</span><span className="sh-account-name">{profile?.name || profile?.username || roleLabels[role]}<small>{roleLabels[role]}</small></span><span className="sh-caret">⌄</span></button>
+                        {profileMenuOpen && <div className="sh-profile-menu" role="dialog" aria-label="Your profile"><div className="sh-profile-menu-heading"><b>{profile?.name || profile?.username || roleLabels[role]}</b><span>{roleLabels[role]}</span></div><dl><dt>Email</dt><dd>{profile?.email || "Not added"}</dd><dt>Phone</dt><dd>{profile?.phone || "Not added"}</dd>{profile?.department?.dept_name && <><dt>Department</dt><dd>{profile.department.dept_name}</dd></>}</dl><button className="sh-primary" onClick={() => { setProfileMenuOpen(false); setProfileEditOpen(true) }}>Edit profile</button></div>}
+                    </>}
+                </div>
+            </header>
             <div className="sh-content">
-                {section === "Dashboard" && <><div className="sh-welcome"><div><p className="sh-eyebrow">SUPPORTHUB WORKSPACE</p><h1>Welcome, {profile?.name || profile?.username || roleLabels[role]}<span>!</span></h1><p className="sh-subtitle">A clear view of the support work that needs your attention.</p></div>{role === "tech_admin" && <div className="sh-welcome-actions"><button className="sh-primary sh-secondary-action" onClick={() => selectSection("Create ticket")}><span aria-hidden="true">＋</span> Create ticket</button><button className="sh-primary sh-secondary-action" onClick={() => { setSection("Team members"); setFormOpen(true) }}><span aria-hidden="true">＋</span> Create team member</button></div>}{role === "super_admin" && <div className="sh-welcome-actions"><button className="sh-primary" aria-haspopup="menu" aria-expanded={createMenuOpen} onClick={() => setCreateMenuOpen(open => !open)}>＋ Create <span aria-hidden="true">⌄</span></button>{createMenuOpen && <div className="sh-create-menu" role="menu"><button role="menuitem" onClick={() => { setCreateMenuOpen(false); setSection("Departments"); setFormOpen(true) }}>Department</button><button role="menuitem" onClick={() => { setCreateMenuOpen(false); setSection("Tech admins"); setFormOpen(true) }}>Tech Admin</button></div>}</div>}</div>
-                    <div className="sh-stat-grid">{(role === "super_admin" ? [["Total tickets", counts.total, "▤", "blue"], ["Departments", departments.length, "▥", "orange"], ["Tech admins", admins.length, "♙", "purple"], ["Team members", members.length, "♧", "green"]] : role === "tech_admin" ? [["Total tickets", counts.total, "▤", "blue"], ["Open tickets", counts.open, "▱", "orange"], ["In progress", counts.progress, "◌", "purple"], ["Resolved", counts.resolved, "✓", "green"]] : [["My tickets", counts.total, "▤", "blue"], ["Open", counts.open, "▱", "orange"], ["In progress", counts.progress, "◌", "purple"], ["Resolved", counts.resolved, "✓", "green"]]).concat([["Avg. resolution", averageResolutionTime(myTickets), "◷", "purple"]]).map(([label, value, icon, color]) => <article className="sh-stat" key={label}><span className={`sh-stat-icon ${color}`}>{icon}</span><div><span>{label}</span><strong>{value}</strong><small>{label === "Avg. resolution" ? "Resolved tickets" : "Current workload"}</small></div></article>)}</div>
+                {section === "Dashboard" && <><div className="sh-welcome"><div><p className="sh-eyebrow">{t("SUPPORTHUB WORKSPACE")}</p><h1>{t("Welcome")}, {profile?.name || profile?.username || t(roleLabels[role])}<span>!</span></h1><p className="sh-subtitle">{t("A clear view of the support work that needs your attention.")}</p></div>{role === "tech_admin" && <div className="sh-welcome-actions"><button className="sh-primary sh-secondary-action" onClick={() => setTicketFormOpen(true)}><span aria-hidden="true">＋</span> {t("Create ticket")}</button><button className="sh-primary sh-secondary-action" onClick={() => setTeamMemberFormOpen(true)}><span aria-hidden="true">＋</span> {t("Create team member")}</button></div>}{role === "super_admin" && <div className="sh-welcome-actions"><button className="sh-primary" aria-haspopup="menu" aria-expanded={createMenuOpen} onClick={() => setCreateMenuOpen(open => !open)}>＋ {t("Create")} <span aria-hidden="true">⌄</span></button>{createMenuOpen && <div className="sh-create-menu" role="menu"><button role="menuitem" onClick={() => { setCreateMenuOpen(false); setSection("Departments"); setFormOpen(true) }}>{t("Departments")}</button><button role="menuitem" onClick={() => { setCreateMenuOpen(false); setSection("Tech admins"); setFormOpen(true) }}>{t("Tech Admin")}</button></div>}</div>}</div>
+                    <div className="sh-stat-grid">{(role === "super_admin" ? [["Total tickets", counts.total, "▤", "blue"], ["Departments", departments.length, "▥", "orange"], ["Tech admins", admins.length, "♙", "purple"], ["Team members", members.length, "♧", "green"]] : role === "tech_admin" ? [["Total tickets", counts.total, "▤", "blue"], ["Open tickets", counts.open, "▱", "orange"], ["In progress", counts.progress, "◌", "purple"], ["Resolved", counts.resolved, "✓", "green"]] : [["My tickets", counts.total, "▤", "blue"], ["Open", counts.open, "▱", "orange"], ["In progress", counts.progress, "◌", "purple"], ["Resolved", counts.resolved, "✓", "green"]]).concat([["Avg. resolution", averageResolutionTime(myTickets), "◷", "purple"]]).map(([label, value, icon, color]) => <article className="sh-stat" key={label}><span className={`sh-stat-icon ${color}`}>{icon}</span><div><span>{t(label)}</span><strong>{value}</strong><small>{t(label === "Avg. resolution" ? "Resolved tickets" : "Current workload")}</small></div></article>)}</div>
                     <div className="sh-panels"><section className="sh-panel sh-wide"><div className="sh-panel-head"><div><h2>Ticket status updates</h2><p>Monthly status changes from ticket history</p></div><button className="sh-link" onClick={() => selectSection(role === "team_member" ? "My tickets" : "All tickets")}>View tickets ↗</button></div><div className="sh-chart"><div className="sh-chart-labels"><span>{monthlyActivity.max}</span><span>{Math.round(monthlyActivity.max * 2 / 3)}</span><span>{Math.round(monthlyActivity.max / 3)}</span><span>0</span></div><div className="sh-chart-area"><div className="sh-grid-lines"><i/><i/><i/><i/></div><svg viewBox="0 0 700 170" preserveAspectRatio="none" aria-label="Monthly ticket status updates"><polyline points={monthlyActivity.open}/><polyline className="line-purple" points={monthlyActivity.progress}/><polyline className="line-green" points={monthlyActivity.resolved}/></svg><div className="sh-months">{monthlyActivity.months.map(month => <span key={month.key}>{month.label}</span>)}</div></div></div><div className="sh-legend"><span><i className="blue-dot"/>Opened</span><span><i className="purple-dot"/>In progress</span><span><i className="green-dot"/>Resolved/closed</span></div></section>
                         <section className="sh-panel sh-breakdown"><div className="sh-panel-head"><div><h2>Tickets by status</h2><p>Current distribution</p></div></div><div className="sh-donut-wrap"><div className="sh-donut" style={{ background: statusDonut(counts) }}><div><strong>{counts.total}</strong><span>Tickets</span></div></div><div className="sh-donut-legend"><span><i className="blue-dot"/>Open <b>{counts.open}</b></span><span><i className="purple-dot"/>In progress <b>{counts.progress}</b></span><span><i className="green-dot"/>Resolved <b>{counts.resolved}</b></span></div></div></section>
                     </div>
                     <div className="sh-panels sh-lower"><TicketTable tickets={recent} role={role} currentUserId={profile?.id} members={members} departments={departments} onAction={updateTicket} onView={() => selectSection(role === "team_member" ? "My tickets" : "All tickets")} /><Activity history={history.slice(0, 5)} onView={() => selectSection("Ticket history")} /></div>
                 </>}
-                {section !== "Dashboard" && <section className="sh-panel sh-list-panel"><div className="sh-panel-head"><div><p className="sh-eyebrow">MANAGE YOUR WORK</p><h2>{section}</h2><p>Live information from your SupportHub workspace.</p></div>{canOpenForm && <button className="sh-primary" onClick={() => setFormOpen(!formOpen)}>{formOpen ? "Close form" : section === "My profile" ? "Edit my profile" : `＋ ${section === "Create ticket" ? "New ticket" : section === "Departments" ? "New department" : section === "Tech admins" ? "New tech admin" : "New team member"}`}</button>}</div>
-                    {formOpen && <div className="sh-modal-backdrop" onClick={() => setFormOpen(false)}><section className="sh-form-modal" role="dialog" aria-modal="true" aria-labelledby="sh-form-title" onClick={event => event.stopPropagation()}><div className="sh-modal-head"><span className="sh-modal-mark">{section === "My profile" ? "♙" : section === "Create ticket" ? "＋" : section === "Departments" ? "▥" : section === "Tech admins" ? "♙" : "♧"}</span><div><p className="sh-eyebrow">SUPPORTHUB WORKSPACE</p><h3 id="sh-form-title">{section === "My profile" ? "Update your profile" : section === "Create ticket" ? "Create a ticket" : `Create ${section === "Departments" ? "a department" : section === "Tech admins" ? "a tech admin" : "a team member"}`}</h3><p>{section === "My profile" ? "Your account details are yours to manage." : section === "Create ticket" ? "Add the request details and assign it to an available teammate." : "Enter the details below to add this to your workspace."}</p></div><button className="sh-modal-close" type="button" aria-label="Close form" onClick={() => setFormOpen(false)}>×</button></div><EntryForm section={section} departments={departments} members={members} profile={profile} fieldErrors={fieldErrors} onClearField={name => setFieldErrors(errors => ({ ...errors, [name]: undefined }))} onSubmit={submitForm} /></section></div>}
+                {section !== "Dashboard" && <section className="sh-panel sh-list-panel"><div className="sh-panel-head"><div><p className="sh-eyebrow">MANAGE YOUR WORK</p><h2>{section}</h2><p>Live information from your SupportHub workspace.</p></div><div className="sh-list-actions">{role === "tech_admin" && section === "All tickets" && <button className="sh-primary" onClick={() => setTicketFormOpen(true)}>＋ Create ticket</button>}{canOpenForm && <button className="sh-primary" onClick={() => formOpen ? closeEntryForm() : setFormOpen(true)}>{formOpen ? "Close form" : section === "My profile" ? "Edit my profile" : `＋ ${section === "Create ticket" ? "New ticket" : section === "Departments" ? "New department" : section === "Tech admins" ? "New tech admin" : "New team member"}`}</button>}</div></div>
+                    {formOpen && createPortal(<div className="sh-modal-backdrop" onClick={closeEntryForm}><section className="sh-form-modal" role="dialog" aria-modal="true" aria-labelledby="sh-form-title" onClick={event => event.stopPropagation()}><div className="sh-modal-head"><span className="sh-modal-mark">{section === "My profile" ? "♙" : section === "Create ticket" ? "＋" : section === "Departments" ? "▥" : section === "Tech admins" ? "♙" : "♧"}</span><div><p className="sh-eyebrow">SUPPORTHUB WORKSPACE</p><h3 id="sh-form-title">{section === "My profile" ? "Update your profile" : section === "Create ticket" ? "Create a ticket" : `Create ${section === "Departments" ? "a department" : section === "Tech admins" ? "a tech admin" : "a team member"}`}</h3><p>{section === "My profile" ? "Your account details are yours to manage." : section === "Create ticket" ? "Add the request details and assign it to an available teammate." : "Enter the details below to add this to your workspace."}</p></div><button className="sh-modal-close" type="button" aria-label="Close form" onClick={closeEntryForm}>×</button></div><EntryForm section={section} departments={departments} members={members} profile={profile} fieldErrors={fieldErrors} onClearField={name => setFieldErrors(errors => ({ ...errors, [name]: undefined }))} onSubmit={submitForm} /></section></div>, document.body)}
                     {!formOpen && (section === "Ticket history" ? <HistoryTable history={history} /> : section === "Departments" ? <SimpleTable headers={["Department", "Responsibilities", "Active members", "Status"]} rows={departments.map(d => [d.dept_name, d.Responsibilities || "—", members.filter(m => m.is_active && m.department?.id === d.id).length, d.is_active ? "Active" : "Inactive"])} records={departments} resource="department" onToggle={updateEntityStatus} /> : section === "Tech admins" ? <SimpleTable headers={["Name", "Username", "Branch", "Team members", "Status"]} rows={admins.map(a => [a.name, a.username, a.branch, a.team_member_count ?? 0, a.is_active ? "Active" : "Inactive"])} records={admins} resource="tech_admin" onToggle={updateEntityStatus} /> : section === "Team members" ? <SimpleTable headers={["Name", "Username", "Department", "Status", "Active tickets"]} rows={members.map(m => [m.name, m.username, m.department?.dept_name || "—", m.is_active ? "Active" : "Inactive", m.active_tickets ?? "—"])} records={members} resource="team_member" onToggle={updateEntityStatus} /> : section === "Create ticket" ? null : <><div className="sh-toolbar"><div className="sh-toolbar-controls"><label className="sh-search">⌕<input value={query} onChange={e => setQuery(e.target.value)} placeholder="Search tickets..." /></label>{section === "All tickets" && <div className="sh-ticket-filters"><CheckboxFilter label="Status" options={["Open", "In Progress", "Resolved", "Closed", "Rejected"].map(value => ({ value, label: value }))} values={statusFilter} onChange={setStatusFilter} open={openFilter === "Status"} onToggle={() => setOpenFilter(current => current === "Status" ? "" : "Status")} /><CheckboxFilter label="Department" options={departments.map(item => ({ value: String(item.id), label: item.dept_name }))} values={departmentFilter} onChange={setDepartmentFilter} open={openFilter === "Department"} onToggle={() => setOpenFilter(current => current === "Department" ? "" : "Department")} /><CheckboxFilter label="Priority" options={["High", "Medium", "Low"].map(value => ({ value, label: value }))} values={priorityFilter} onChange={setPriorityFilter} open={openFilter === "Priority"} onToggle={() => setOpenFilter(current => current === "Priority" ? "" : "Priority")} />{(statusFilter.length || departmentFilter.length || priorityFilter.length) > 0 && <button type="button" className="sh-clear-filters" onClick={() => { setStatusFilter([]); setDepartmentFilter([]); setPriorityFilter([]) }}>Clear filters</button>}</div>}</div><span>{filtered.length} tickets</span></div><TicketTable tickets={rows} role={role} currentUserId={profile?.id} members={members} departments={departments} onAction={updateTicket} /></>)}
                 </section>}
-                    {profileEditOpen && <div className="sh-modal-backdrop" onClick={() => setProfileEditOpen(false)}><section className="sh-form-modal" role="dialog" aria-modal="true" aria-labelledby="sh-profile-title" onClick={event => event.stopPropagation()}><div className="sh-modal-head"><span className="sh-modal-mark">♙</span><div><p className="sh-eyebrow">YOUR ACCOUNT</p><h3 id="sh-profile-title">Edit your profile</h3><p>Update your personal details and profile photo.</p></div><button className="sh-modal-close" type="button" aria-label="Close profile editor" onClick={() => setProfileEditOpen(false)}>×</button></div><EntryForm section="My profile" departments={departments} members={members} profile={profile} fieldErrors={fieldErrors} onClearField={name => setFieldErrors(errors => ({ ...errors, [name]: undefined }))} onSubmit={event => submitForm(event, "My profile")} /></section></div>}
+                    {profileEditOpen && createPortal(<div className="sh-modal-backdrop" onClick={() => setProfileEditOpen(false)}><section className="sh-form-modal" role="dialog" aria-modal="true" aria-labelledby="sh-profile-title" onClick={event => event.stopPropagation()}><div className="sh-modal-head"><span className="sh-modal-mark">♙</span><div><p className="sh-eyebrow">YOUR ACCOUNT</p><h3 id="sh-profile-title">Edit your profile</h3><p>Update your personal details and profile photo.</p></div><button className="sh-modal-close" type="button" aria-label="Close profile editor" onClick={() => setProfileEditOpen(false)}>×</button></div><EntryForm section="My profile" departments={departments} members={members} profile={profile} fieldErrors={fieldErrors} onClearField={name => setFieldErrors(errors => ({ ...errors, [name]: undefined }))} onSubmit={event => submitForm(event, "My profile")} /></section></div>, document.body)}
                     {loading && <div className="sh-loading"><span className="sh-spinner"/>Loading workspace…</div>}
             </div>
         </main>
+        {ticketFormOpen && createPortal(<div className="sh-modal-backdrop" onClick={() => setTicketFormOpen(false)}><section className="sh-form-modal" role="dialog" aria-modal="true" aria-labelledby="sh-create-ticket-title" onClick={event => event.stopPropagation()}><div className="sh-modal-head"><span className="sh-modal-mark">＋</span><div><p className="sh-eyebrow">SUPPORTHUB WORKSPACE</p><h3 id="sh-create-ticket-title">Create a ticket</h3><p>Add the request details and assign it to an available teammate.</p></div><button className="sh-modal-close" type="button" aria-label="Close form" onClick={() => setTicketFormOpen(false)}>×</button></div><EntryForm section="Create ticket" departments={departments} members={members} profile={profile} fieldErrors={fieldErrors} onClearField={name => setFieldErrors(errors => ({ ...errors, [name]: undefined }))} onSubmit={event => submitForm(event, "Create ticket")} /></section></div>, document.body)}
+        {teamMemberFormOpen && createPortal(<div className="sh-modal-backdrop" onClick={() => setTeamMemberFormOpen(false)}><section className="sh-form-modal" role="dialog" aria-modal="true" aria-labelledby="sh-create-member-title" onClick={event => event.stopPropagation()}><div className="sh-modal-head"><span className="sh-modal-mark">♧</span><div><p className="sh-eyebrow">SUPPORTHUB WORKSPACE</p><h3 id="sh-create-member-title">Create a team member</h3><p>Enter the details below to add a teammate to your workspace.</p></div><button className="sh-modal-close" type="button" aria-label="Close form" onClick={() => setTeamMemberFormOpen(false)}>×</button></div><EntryForm section="Team members" departments={departments} members={members} profile={profile} fieldErrors={fieldErrors} onClearField={name => setFieldErrors(errors => ({ ...errors, [name]: undefined }))} onSubmit={event => submitForm(event, "Team members")} /></section></div>, document.body)}
     </div>
 }
 

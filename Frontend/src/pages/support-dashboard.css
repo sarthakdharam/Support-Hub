@@ -188,10 +188,77 @@ body{background:#e9edf7}
 .sh-welcome-actions>.sh-secondary-action:hover{border-color:#8ccac7!important;background:#d6eeec!important;color:#105c68!important}
 .sh-welcome-actions>.sh-primary:not(.sh-secondary-action){background:linear-gradient(105deg,#168e8a,#167b9c);color:#fff}
 .sh-row-action:not(.sh-icon-action){border:1px solid #cbe4e4;background:#e5f2f2;color:#176e7a}
+
+/* Keep create/edit dialogs below the fixed app header and within the visible screen. */
+.sh-modal-backdrop:not(.sh-delete-backdrop){
+    inset:68px 0 0;
+    min-height:0;
+    padding:18px;
+    overflow-y:auto;
+    overscroll-behavior:contain;
+}
+.sh-form-modal{
+    max-height:calc(100dvh - 104px);
+    min-height:0;
+    overscroll-behavior:contain;
+}
+@media(max-width:800px){
+    .sh-modal-backdrop:not(.sh-delete-backdrop){inset:60px 0 0;padding:12px;}
+    .sh-form-modal{max-height:calc(100dvh - 84px);}
+}
+@media(max-width:600px){
+    .sh-modal-backdrop:not(.sh-delete-backdrop){align-items:center;}
+}
+.sh-modal-backdrop:not(.sh-delete-backdrop){
+    z-index:10000;
+    align-items:center;
+}
+.sh-form-modal{
+    display:flex;
+    flex-direction:column;
+    width:min(100%,720px);
+    max-height:calc(100dvh - 104px);
+    overflow:hidden;
+}
+.sh-form-modal .sh-modal-head{flex:none;}
+.sh-form-modal .sh-entry-form{
+    min-height:0;
+    overflow-y:auto;
+    overscroll-behavior:contain;
+}
+@media(max-width:800px){
+    .sh-form-modal{max-height:calc(100dvh - 84px);}
+}
+.sh-list-actions{display:flex;align-items:center;gap:9px;flex:none}
+@media(max-width:600px){.sh-list-actions{width:100%;justify-content:flex-start;flex-wrap:wrap}}
 .sh-ticket-actions .sh-icon-action:not(.sh-delete-action):not(.sh-reject-action){background:#e1f1f1;color:#167887}
 .sh-ticket-actions .sh-edit-action{background:#d7eeee;color:#126f78}
 .sh-primary:focus-visible,.sh-secondary-action:focus-visible,.sh-row-action:focus-visible,.sh-mobile-menu:focus-visible{outline:3px solid #27a9a455;outline-offset:2px}
 .login-mobile-brand span{color:#168e8a}
+.sh-notification-wrap{position:relative;display:flex;align-items:center}
+.sh-notification-button{position:relative;display:grid;place-items:center;width:38px;height:38px;padding:0;border:1px solid transparent;border-radius:10px;background:transparent;color:#277989;cursor:pointer;transition:background .15s,border-color .15s}
+.sh-notification-button:hover,.sh-notification-button[aria-expanded="true"]{border-color:#c6e3e2;background:#dcefee}
+.sh-notification-button svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.sh-notification-count{position:absolute;top:1px;right:0;min-width:17px;height:17px;padding:0 4px;display:grid;place-items:center;border:2px solid #e7f1f3;border-radius:10px;background:#e14e5e;color:#fff;font-size:8px;font-weight:700;line-height:1}
+.sh-notification-menu{position:absolute;top:calc(100% + 10px);right:-48px;z-index:40;width:min(360px,calc(100vw - 24px));overflow:hidden;border:1px solid #cfe0e5;border-radius:14px;background:#f2f7f8;box-shadow:0 20px 48px #153f4d30;animation:sh-modal-in .18s ease-out}
+.sh-notification-heading{display:flex;align-items:center;justify-content:space-between;padding:15px 16px;border-bottom:1px solid #dce8eb;background:linear-gradient(110deg,#e5f2f2,#e8f0f5)}
+.sh-notification-heading>div{display:grid;gap:3px}
+.sh-notification-heading strong{color:#1c4352;font:700 13px Manrope,sans-serif}
+.sh-notification-heading small{color:#66808e;font-size:10px}
+.sh-notification-heading>button{width:27px;height:27px;border:0;border-radius:7px;background:transparent;color:#65808d;font-size:20px;cursor:pointer}
+.sh-notification-heading>button:hover{background:#d7e9e9;color:#176f78}
+.sh-notification-list{max-height:min(390px,65vh);overflow:auto;padding:5px}
+.sh-notification-item{width:100%;display:flex;align-items:flex-start;gap:10px;padding:11px 10px;border:0;border-radius:9px;background:transparent;text-align:left;cursor:pointer}
+.sh-notification-item:hover{background:#e6f0f2}
+.sh-notification-item.is-unread{background:#e5f3f1}
+.sh-notification-dot{width:8px;height:8px;flex:0 0 8px;margin-top:4px;border-radius:50%;background:#22a39a}
+.sh-notification-item.is-read .sh-notification-dot{background:#bdcbd2}
+.sh-notification-copy{min-width:0;display:grid;gap:4px}
+.sh-notification-copy strong{color:#234657;font-size:10px;font-weight:700}
+.sh-notification-copy>span{color:#526e7c;font-size:10px;line-height:1.45;white-space:normal;overflow-wrap:anywhere}
+.sh-notification-copy small{color:#8295a0;font-size:9px}
+.sh-notification-empty{margin:0;padding:27px 12px;color:#718895;text-align:center;font-size:11px}
+@media(max-width:480px){.sh-notification-menu{right:-44px;width:min(340px,calc(100vw - 18px))}.sh-account{gap:5px}}
 @media(max-width:700px){.sh-toolbar{align-items:flex-start;gap:10px;flex-direction:column}.sh-toolbar-controls{width:100%}.sh-ticket-filters{width:100%}.sh-ticket-filters label{flex:1;min-width:145px}.sh-ticket-filters select{width:100%;min-width:0}}
 @media(max-width:520px){.sh-ticket-edit-form{grid-template-columns:1fr}.sh-ticket-edit-form label:nth-child(2),.sh-edit-actions{grid-column:1}}
 .sh-welcome{gap:22px;flex-wrap:wrap}
