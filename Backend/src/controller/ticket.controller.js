@@ -10,6 +10,19 @@ const {Ticket_History}=require('../entities/ticket_history.entity')
 const ALLOWED_PRIORITIES = ['Low', 'Medium', 'High']
 const ACTIVE_TICKET_STATUSES = ['Open', 'In Progress']  
 
+function isValidFutureDate(value) {
+    if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false
+    const selectedDate = new Date(`${value}T00:00:00.000Z`)
+    if (Number.isNaN(selectedDate.getTime()) || selectedDate.toISOString().slice(0, 10) !== value) return false
+    const today = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'Asia/Kolkata',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+    }).format(new Date())
+    return value > today
+}
+
 const Create_Ticket = async (req, res) => {
     try {
         const { subject, description, department, member, priority, due_at } = req.body
@@ -224,14 +237,89 @@ const Get_My_Tickets = async (req, res) => {
     }
 }
 
+const Delete_Ticket = async (req, res) => {
+    try {
+        const { ticket_id } = req.params
+        const { role, userId } = req.user
+
+        if (!Number.isInteger(Number(ticket_id)) || Number(ticket_id) < 1000 || Number(ticket_id) > 9999) {
+            return res.status(400).json({ message: 'Enter a valid four-digit ticket number' })
+        }
+
+        if (role !== 'tech_admin') {
+            return res.status(403).json({ message: 'Only the Tech Admin who created the ticket can delete it' })
+        }
+
+        const techAdmin = await Tech_AdminRepository.findOneBy({ id: userId, is_active: true })
+        if (!techAdmin) return res.status(403).json({ message: 'Active Tech Admin not found' })
+
+        await AppDataSource.transaction(async manager => {
+            const ticketRepo = manager.getRepository(Ticket)
+            const teamMemberRepo = manager.getRepository(Team_Member)
+            const lockedTicket = await ticketRepo
+                .createQueryBuilder('ticket')
+                .setLock('pessimistic_write')
+                .where('ticket.ticket_id = :ticket_id', { ticket_id: Number(ticket_id) })
+                .getOne()
+
+            if (!lockedTicket) throw new Error('Ticket_Not_Found')
+
+            const ticket = await ticketRepo.findOne({
+                where: { id: lockedTicket.id },
+                relations: { team_member: true, tech_admin: true }
+            })
+
+            if (!ticket) throw new Error('Ticket_Not_Found')
+            if (ticket.tech_admin?.id !== userId) {
+                throw new Error('Not_Ticket_Owner')
+            }
+            if (ticket.status !== 'Open') throw new Error('Ticket_Not_Open')
+
+            if (ticket.team_member) {
+                const assignedMember = await teamMemberRepo
+                    .createQueryBuilder('member')
+                    .setLock('pessimistic_write')
+                    .where('member.id = :id', { id: ticket.team_member.id })
+                    .getOne()
+
+                if (!assignedMember) throw new Error('Member_Not_Found')
+                if (assignedMember.active_tickets <= 0) throw new Error('Invalid_Ticket_Counter')
+
+                assignedMember.active_tickets -= 1
+                await teamMemberRepo.save(assignedMember)
+            }
+
+            await ticketRepo.softDelete({ id: ticket.id })
+        })
+
+        return res.status(200).json({ message: 'Ticket deleted successfully' })
+    } catch (err) {
+        const errors = {
+            Ticket_Not_Found: [404, 'Ticket not found'],
+            Not_Ticket_Owner: [403, 'You can only delete tickets created by your account'],
+            Ticket_Not_Open: [400, 'Only Open tickets can be deleted'],
+            Member_Not_Found: [404, 'The assigned Team Member was not found'],
+            Invalid_Ticket_Counter: [409, 'Active ticket counter is inconsistent; please investigate']
+        }
+
+        if (errors[err.message]) {
+            const [status, message] = errors[err.message]
+            return res.status(status).json({ message })
+        }
+
+        console.error(err)
+        return res.status(500).json({ message: 'Error while deleting ticket' })
+    }
+}
+
 const Update_Ticket = async (req, res) => {
     try {
-        const {ticket_id,edit_details,reassign,start_work,resolve,close} = req.body
+        const {ticket_id,edit_details,reassign,start_work,resolve,reject,close} = req.body
 
         const role = req.user.role
         const userId = req.user.userId
 
-        const operations = [edit_details, reassign,start_work, resolve, close]
+        const operations = [edit_details, reassign,start_work, resolve, reject, close]
             .filter(value => value === true).length
 
         if (operations !== 1) {
@@ -246,8 +334,16 @@ const Update_Ticket = async (req, res) => {
             return res.status(403).json({message: 'Only Tech Admin can reassign tickets'})
         }
 
-        if ((edit_details || start_work || resolve || close) && role !== 'team_member') {
+        if ((start_work || resolve || reject) && role !== 'team_member') {
             return res.status(403).json({message: 'Only Team Members can perform this operation'})
+        }
+
+        if (edit_details && !['tech_admin', 'team_member'].includes(role)) {
+            return res.status(403).json({message: 'Only Tech Admins or assigned Team Members can edit tickets'})
+        }
+
+        if (close && role !== 'tech_admin') {
+            return res.status(403).json({message: 'Only Tech Admins can close resolved tickets'})
         }
 
         if (edit_details) {
@@ -308,6 +404,17 @@ const Update_Ticket = async (req, res) => {
             }
         }
 
+        if (close) {
+            const tech_admin = await Tech_AdminRepository.findOneBy({
+                id: userId,
+                is_active: true
+            })
+
+            if (!tech_admin) {
+                return res.status(403).json({message: 'Active Tech Admin not found'})
+            }
+        }
+
         const updatedTicket = await AppDataSource.transaction(async (manager) => {
                 const ticketRepo = manager.getRepository(Ticket)
                 const teamMemberRepo = manager.getRepository(Team_Member)
@@ -343,7 +450,14 @@ const Update_Ticket = async (req, res) => {
                 }
 
                 if (edit_details) {
-                    if (!ticket.team_member || ticket.team_member.id !== userId) {
+                    if (role === 'tech_admin') {
+                        if (!ticket.tech_admin || ticket.tech_admin.id !== userId) {
+                            throw new Error('Not_Ticket_Owner')
+                        }
+                        if (!isActive && ticket.status !== 'Rejected') {
+                            throw new Error('Ticket_Not_Editable')
+                        }
+                    } else if (!ticket.team_member || ticket.team_member.id !== userId) {
                         throw new Error('Not_Assigned_To_Member')
                     }
 
@@ -356,7 +470,9 @@ const Update_Ticket = async (req, res) => {
                 }
 
                 if (reassign) {
-                    if (!isActive) {
+                    const isRejected = ticket.status === 'Rejected'
+
+                    if (!isActive && !isRejected) {
                         throw new Error('Ticket_Not_Active')
                     }
 
@@ -422,24 +538,27 @@ const Update_Ticket = async (req, res) => {
                         throw new Error('Ticket_Limit_Reached')
                     }
 
-                    if (oldMember.active_tickets <= 0) {
+                    if (isActive && oldMember.active_tickets <= 0) {
                         throw new Error('Invalid_Ticket_Counter')
                     }
 
-                    oldMember.active_tickets -= 1
+                    if (isActive) oldMember.active_tickets -= 1
                     lockedNewMember.active_tickets += 1
 
                     await teamMemberRepo.save([oldMember,lockedNewMember])
 
                     ticket.department = { id: dept.id }
                     ticket.team_member = { id: lockedNewMember.id }
+                    if (isRejected) ticket.status = 'Open'
 
                     const savedTicket = await ticketRepo.save(ticket)
 
                     const history = historyRepo.create({
-                        old_status: ticket.status,
+                        old_status: isRejected ? 'Rejected' : ticket.status,
                         new_status: ticket.status,
-                        note: `Ticket reassigned from ${oldMemberId} to ${lockedNewMember.id}`,
+                        note: isRejected
+                            ? `Rejected ticket reassigned from ${oldMemberId} to ${lockedNewMember.id}`
+                            : `Ticket reassigned from ${oldMemberId} to ${lockedNewMember.id}`,
                         ticket: { id: ticket.id },
                         changed_by_admin: { id: userId }
                     })
@@ -473,6 +592,51 @@ const Update_Ticket = async (req, res) => {
                         old_status,
                         new_status,
                         note: 'Work started on the ticket',
+                        ticket: { id: ticket.id },
+                        changed_by_member: { id: userId }
+                    })
+
+                    await historyRepo.save(history)
+
+                    return savedTicket
+                }
+
+                if (reject) {
+                    if (!ticket.team_member || ticket.team_member.id !== userId) {
+                        throw new Error('Not_Assigned_To_Member')
+                    }
+
+                    if (!isActive) {
+                        throw new Error('Invalid_Status_For_Reject')
+                    }
+
+                    const assignedMember = await teamMemberRepo
+                        .createQueryBuilder('member')
+                        .setLock('pessimistic_write')
+                        .where('member.id = :id', { id: userId })
+                        .getOne()
+
+                    if (!assignedMember) {
+                        throw new Error('Member_Not_Found')
+                    }
+
+                    if (assignedMember.active_tickets <= 0) {
+                        throw new Error('Invalid_Ticket_Counter')
+                    }
+
+                    const old_status = ticket.status
+                    const new_status = 'Rejected'
+
+                    assignedMember.active_tickets -= 1
+                    ticket.status = new_status
+
+                    await teamMemberRepo.save(assignedMember)
+                    const savedTicket = await ticketRepo.save(ticket)
+
+                    const history = historyRepo.create({
+                        old_status,
+                        new_status,
+                        note: 'Ticket rejected by assigned team member; reassignment needed',
                         ticket: { id: ticket.id },
                         changed_by_member: { id: userId }
                     })
@@ -542,40 +706,12 @@ const Update_Ticket = async (req, res) => {
                 }
 
                 if (close) {
-                    if (!ticket.team_member || ticket.team_member.id !== userId) {
-                        throw new Error('Not_Assigned_To_Member')
+                    if (!ticket.tech_admin || ticket.tech_admin.id !== userId) {
+                        throw new Error('Not_Ticket_Creator')
                     }
 
-                    if (ticket.status !== 'In Progress') {
+                    if (ticket.status !== 'Resolved') {
                         throw new Error('Invalid_Status_For_Close')
-                    }
-
-                    if (ticket.status === 'Resolved') {
-                        throw new Error('Alredy_Resolved')
-                    }
-
-                    if (ticket.status === 'Closed') {
-                        throw new Error('Alredy_Closed')
-                    }
-
-                    if (isActive) {
-                        const assignedMember = await teamMemberRepo
-                            .createQueryBuilder('member')
-                            .setLock('pessimistic_write')
-                            .where('member.id = :id', { id: userId })
-                            .getOne()
-
-                        if (!assignedMember) {
-                            throw new Error('Member_Not_Found')
-                        }
-
-                        if (assignedMember.active_tickets <= 0) {
-                            throw new Error('Invalid_Ticket_Counter')
-                        }
-
-                        assignedMember.active_tickets -= 1
-
-                        await teamMemberRepo.save(assignedMember)
                     }
 
                     const old_status = ticket.status
@@ -590,7 +726,7 @@ const Update_Ticket = async (req, res) => {
                         new_status,
                         note: 'Ticket closed',
                         ticket: { id: ticket.id },
-                        changed_by_member: { id: userId }
+                        changed_by_admin: { id: userId }
                     })
 
                     await historyRepo.save(history)
@@ -608,7 +744,8 @@ const Update_Ticket = async (req, res) => {
     } catch (err) {
         const errors = {
             Ticket_Not_Found: [404, 'Ticket not found'],
-            Not_Ticket_Owner: [403, 'You can only reassign tickets created by your account'],
+            Not_Ticket_Owner: [403, 'You can only edit or reassign tickets created by your account'],
+            Not_Ticket_Creator: [403, 'You can only close tickets created by your account'],
             Not_Assigned_To_Member: [
                 403,
                 'You can only update tickets assigned to you'
@@ -635,8 +772,9 @@ const Update_Ticket = async (req, res) => {
             ],
             Ticket_Not_Active: [
                 400,
-                'Only active tickets can be reassigned or resolved'
+                'Only Open, In Progress, or Rejected tickets can be reassigned'
             ],
+            Ticket_Not_Editable: [400, 'Only Open, In Progress, or Rejected tickets can be edited'],
             Alredy_Resolved: [
                 400,
                 'Ticket is already resolved'
@@ -661,6 +799,10 @@ const Update_Ticket = async (req, res) => {
                 400,
                 'Only In Progress tickets can be resolved'
             ],
+            Invalid_Status_For_Reject: [
+                400,
+                'Only Open or In Progress tickets can be rejected'
+            ],
             Invalid_Status_For_Close: [
                 400,
                 'Only Resolved tickets can be closed'
@@ -680,4 +822,4 @@ const Update_Ticket = async (req, res) => {
     }
 }
 
-module.exports={Create_Ticket,Get_Tickets,Get_My_Tickets,Update_Ticket}
+module.exports={Create_Ticket,Get_Tickets,Get_My_Tickets,Update_Ticket,Delete_Ticket}

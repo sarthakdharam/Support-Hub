@@ -119,7 +119,13 @@ const Get_Tech_Admin=async (req,res)=>{
                 id:'ASC'
             }
         })
-        res.status(200).json(tech_admin)
+        const adminsWithMemberCounts = await Promise.all(tech_admin.map(async admin => ({
+            ...admin,
+            team_member_count: await Team_MemberRepository.count({
+                where: { tech_admin: { id: admin.id } }
+            })
+        })))
+        res.status(200).json(adminsWithMemberCounts)
         
     }catch(err){
         console.log(err)

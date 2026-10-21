@@ -230,10 +230,13 @@ const Delete_Team_Member=async (req,res)=>{
 
         const {id}=req.params
 
-        const team_member=await Team_MemberRepository.findOneBy({id})
+        const team_member=await Team_MemberRepository.findOne({ where: { id }, relations: { tech_admin: true } })
 
         if(!team_member){
             return res.status(404).json({message:'Team Member Not Found'})
+        }
+        if (team_member.tech_admin?.id !== req.user.userId) {
+            return res.status(403).json({ message: 'You can only deactivate team members in your department' })
         }
 
         if (!team_member.is_active) {
@@ -256,10 +259,13 @@ const Activate_Team_Member=async (req,res)=>{
 
         const {id}=req.params
 
-        const team_member=await Team_MemberRepository.findOneBy({id})
+        const team_member=await Team_MemberRepository.findOne({ where: { id }, relations: { tech_admin: true } })
 
         if(!team_member){
             return res.status(404).json({message:'Team Member Not Found'})
+        }
+        if (team_member.tech_admin?.id !== req.user.userId) {
+            return res.status(403).json({ message: 'You can only activate team members in your department' })
         }
 
         if (team_member.is_active) {

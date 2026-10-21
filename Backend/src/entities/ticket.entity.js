@@ -59,6 +59,12 @@ const Ticket = new EntitySchema({
             type: 'timestamp',
             nullable: true,
         },
+
+        deleted_at: {
+            type: 'timestamp',
+            nullable: true,
+            deleteDate: true,
+        },
     },
 
     relations: {

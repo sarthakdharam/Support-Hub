@@ -73,7 +73,7 @@ function Login() {
                 <div className="login-hero-glow login-glow-two" />
                 <div className="login-brand">
                     <img src={logo} alt="SupportHub" />
-                    <span>SUPPORT OPERATIONS</span>
+                    <span className="login-brand-copy"><strong>SupportHub</strong><small>SUPPORT OPERATIONS</small></span>
                 </div>
                 <div className="login-hero-copy">
                     <div className="login-eyebrow"><i /> ONE WORKSPACE, EVERY REQUEST</div>
