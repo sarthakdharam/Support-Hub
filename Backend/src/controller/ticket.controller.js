@@ -194,7 +194,9 @@ const Get_Tickets = async (req, res) => {
                 team_member: {
                     id: true,
                     name: true,
-                    username: true
+                    username: true,
+                    active_tickets: true,
+                    is_active: true
                 },
                 tech_admin: {
                     id: true,
@@ -242,6 +244,76 @@ const Get_My_Tickets = async (req, res) => {
     } catch (err) {
         console.error(err)
         return res.status(500).json({ message: 'Error While Getting Your Tickets' })
+    }
+}
+
+const Get_Ticket_Reports = async (req, res) => {
+    try {
+        const { from, to } = req.query
+        const isDate = value => typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(Date.parse(`${value}T00:00:00.000Z`))
+        if (!isDate(from) || !isDate(to) || new Date(`${from}T00:00:00.000Z`).toISOString().slice(0, 10) !== from || new Date(`${to}T00:00:00.000Z`).toISOString().slice(0, 10) !== to || from > to) {
+            return res.status(400).json({ message: 'Provide a valid from and to date range' })
+        }
+
+        const endExclusive = new Date(`${to}T00:00:00.000Z`)
+        endExclusive.setUTCDate(endExclusive.getUTCDate() + 1)
+        const query = TicketRepository.createQueryBuilder('ticket')
+            .leftJoinAndSelect('ticket.department', 'department')
+            .leftJoinAndSelect('ticket.team_member', 'team_member')
+            .leftJoinAndSelect('ticket.tech_admin', 'tech_admin')
+            .where('ticket.created_at >= :from', { from: `${from}T00:00:00.000Z` })
+            .andWhere('ticket.created_at < :to', { to: endExclusive.toISOString() })
+        if (req.user.role === 'tech_admin') query.andWhere('tech_admin.id = :techAdminId', { techAdminId: req.user.userId })
+
+        const tickets = await query.orderBy('ticket.created_at', 'DESC').getMany()
+        const byDepartment = new Map()
+        const byMember = new Map()
+        const statuses = {}
+        let resolutionTotalMs = 0
+        let resolutionCount = 0
+        const now = Date.now()
+        let overdue = 0
+
+        for (const ticket of tickets) {
+            statuses[ticket.status] = (statuses[ticket.status] || 0) + 1
+            const departmentName = ticket.department?.dept_name || 'Unassigned'
+            const departmentKey = ticket.department?.id || departmentName
+            const departmentRow = byDepartment.get(departmentKey) || { name: departmentName, total: 0, resolved: 0, overdue: 0 }
+            departmentRow.total += 1
+            if (['Resolved', 'Closed'].includes(ticket.status)) departmentRow.resolved += 1
+            const isOverdue = ticket.due_at && new Date(ticket.due_at).getTime() < now && !['Resolved', 'Closed'].includes(ticket.status)
+            if (isOverdue) { overdue += 1; departmentRow.overdue += 1 }
+            byDepartment.set(departmentKey, departmentRow)
+
+            const memberName = ticket.team_member?.name || 'Unassigned'
+            const memberKey = ticket.team_member?.id || `unassigned:${departmentKey}`
+            const memberRow = byMember.get(memberKey) || { id: ticket.team_member?.id || null, name: memberName, department: departmentName, total: 0, active: 0, resolved: 0 }
+            memberRow.total += 1
+            if (['Open', 'In Progress'].includes(ticket.status)) memberRow.active += 1
+            if (['Resolved', 'Closed'].includes(ticket.status)) memberRow.resolved += 1
+            byMember.set(memberKey, memberRow)
+
+            if (ticket.resolved_at && ticket.created_at) {
+                const duration = new Date(ticket.resolved_at).getTime() - new Date(ticket.created_at).getTime()
+                if (Number.isFinite(duration) && duration >= 0) { resolutionTotalMs += duration; resolutionCount += 1 }
+            }
+        }
+
+        return res.status(200).json({
+            range: { from, to },
+            summary: {
+                total: tickets.length,
+                resolved: (statuses.Resolved || 0) + (statuses.Closed || 0),
+                overdue,
+                average_resolution_hours: resolutionCount ? Math.round(resolutionTotalMs / resolutionCount / 3600000 * 10) / 10 : null,
+                statuses
+            },
+            by_department: [...byDepartment.values()].sort((a, b) => b.total - a.total),
+            by_member: [...byMember.values()].sort((a, b) => b.total - a.total)
+        })
+    } catch (err) {
+        console.error(err)
+        return res.status(500).json({ message: 'Could not generate ticket reports' })
     }
 }
 
@@ -322,12 +394,12 @@ const Delete_Ticket = async (req, res) => {
 
 const Update_Ticket = async (req, res) => {
     try {
-        const {ticket_id,edit_details,reassign,start_work,resolve,reject,close} = req.body
+        const {ticket_id,edit_details,reassign,start_work,resolve,reject,close,reopen,reason} = req.body
 
         const role = req.user.role
         const userId = req.user.userId
 
-        const operations = [edit_details, reassign,start_work, resolve, reject, close]
+        const operations = [edit_details, reassign,start_work, resolve, reject, close, reopen]
             .filter(value => value === true).length
 
         if (operations !== 1) {
@@ -352,6 +424,13 @@ const Update_Ticket = async (req, res) => {
 
         if (close && role !== 'tech_admin') {
             return res.status(403).json({message: 'Only Tech Admins can close resolved tickets'})
+        }
+
+        if (reopen && role !== 'tech_admin') {
+            return res.status(403).json({ message: 'Only the ticket creator can reopen a resolved ticket' })
+        }
+        if (reopen && (typeof reason !== 'string' || reason.trim().length < 5 || reason.trim().length > 1000)) {
+            return res.status(400).json({ message: 'Enter a reopening reason between 5 and 1000 characters' })
         }
 
         if (edit_details) {
@@ -739,13 +818,49 @@ const Update_Ticket = async (req, res) => {
                     const history = historyRepo.create({
                         old_status,
                         new_status,
-                        note: 'Ticket closed',
+                        note: 'Resolution confirmed by ticket creator',
                         ticket: { id: ticket.id },
                         changed_by_admin: { id: userId }
                     })
 
                     await historyRepo.save(history)
 
+                    return savedTicket
+                }
+
+                if (reopen) {
+                    if (!ticket.tech_admin || ticket.tech_admin.id !== userId) throw new Error('Not_Ticket_Creator')
+                    if (ticket.status !== 'Resolved' || !ticket.resolved_at) throw new Error('Invalid_Status_For_Reopen')
+                    const resolvedAt = new Date(ticket.resolved_at).getTime()
+                    if (!Number.isFinite(resolvedAt) || Date.now() - resolvedAt > 7 * 24 * 60 * 60 * 1000) throw new Error('Reopen_Window_Expired')
+                    if (!ticket.team_member) throw new Error('Member_Not_Found')
+
+                    const assignedMember = await teamMemberRepo
+                        .createQueryBuilder('member')
+                        .setLock('pessimistic_write')
+                        .where('member.id = :id', { id: ticket.team_member.id })
+                        .getOne()
+                    if (!assignedMember || !assignedMember.is_active) throw new Error('Member_Not_Found')
+                    if (assignedMember.active_tickets >= 5) throw new Error('Ticket_Limit_Reached')
+
+                    const old_status = ticket.status
+                    ticket.status = 'Open'
+                    ticket.resolved_at = null
+                    assignedMember.active_tickets += 1
+                    await teamMemberRepo.save(assignedMember)
+                    const savedTicket = await ticketRepo.save(ticket)
+                    await historyRepo.save(historyRepo.create({
+                        old_status,
+                        new_status: 'Open',
+                        note: `Ticket reopened: ${reason.trim()}`,
+                        ticket: { id: ticket.id },
+                        changed_by_admin: { id: userId }
+                    }))
+                    await notificationRepo.save(notificationRepo.create({
+                        message: `Ticket #${savedTicket.ticket_id} was reopened: ${reason.trim()}`,
+                        ticket_id: savedTicket.ticket_id,
+                        member: { id: assignedMember.id }
+                    }))
                     return savedTicket
                 }
             }
@@ -760,7 +875,7 @@ const Update_Ticket = async (req, res) => {
         const errors = {
             Ticket_Not_Found: [404, 'Ticket not found'],
             Not_Ticket_Owner: [403, 'You can only edit or reassign tickets created by your account'],
-            Not_Ticket_Creator: [403, 'You can only close tickets created by your account'],
+            Not_Ticket_Creator: [403, 'Only the Tech Admin who created the ticket can perform this action'],
             Not_Assigned_To_Member: [
                 403,
                 'You can only update tickets assigned to you'
@@ -821,7 +936,9 @@ const Update_Ticket = async (req, res) => {
             Invalid_Status_For_Close: [
                 400,
                 'Only Resolved tickets can be closed'
-            ]
+            ],
+            Invalid_Status_For_Reopen: [400, 'Only recently resolved tickets can be reopened'],
+            Reopen_Window_Expired: [400, 'Tickets can only be reopened within 7 days of resolution']
 
         }
 
@@ -837,4 +954,4 @@ const Update_Ticket = async (req, res) => {
     }
 }
 
-module.exports={Create_Ticket,Get_Tickets,Get_My_Tickets,Update_Ticket,Delete_Ticket}
+module.exports={Create_Ticket,Get_Tickets,Get_My_Tickets,Get_Ticket_Reports,Update_Ticket,Delete_Ticket}

@@ -231,6 +231,28 @@ body{background:#e9edf7}
 }
 .sh-list-actions{display:flex;align-items:center;gap:9px;flex:none}
 @media(max-width:600px){.sh-list-actions{width:100%;justify-content:flex-start;flex-wrap:wrap}}
+.sh-reopen-reason{display:grid;gap:7px;margin:17px 0;color:#526979;font-size:11px;font-weight:650}
+.sh-reopen-reason textarea{width:100%;min-height:100px;padding:11px 12px;resize:vertical;border:1px solid #d7e5e9;border-radius:9px;background:#f1f6f8;color:#1c3544;font:500 12px 'DM Sans',sans-serif}
+.sh-reopen-reason textarea:focus{outline:0;border-color:#38a8a3;box-shadow:0 0 0 3px #168e8a1a}
+.sh-report-filters{display:flex;align-items:end;gap:11px;flex-wrap:wrap;padding:16px;margin-bottom:16px;border:1px solid #d7e5e9;border-radius:12px;background:#edf4f6}
+.sh-report-filters label{display:grid;gap:6px;color:#526979;font-size:10px;font-weight:700}
+.sh-report-filters input{min-height:38px;padding:8px 10px;border:1px solid #d7e5e9;border-radius:8px;background:#f8fbfc;color:#1c3544;font:500 12px 'DM Sans',sans-serif}
+.sh-report-filters button{min-height:38px}
+.sh-report-export{padding:9px 14px;border:1px solid #bad5da;border-radius:8px;background:#e2f0f2;color:#176e7a;font:650 11px 'DM Sans',sans-serif;cursor:pointer}
+.sh-report-export:disabled{opacity:.5;cursor:not-allowed}
+.sh-report-error{padding:10px 12px;border:1px solid #f1c7cc;border-radius:8px;background:#fff1f2;color:#a72e40;font-size:12px}
+.sh-report-range{margin:0 0 12px;color:#718895;font-size:11px}
+.sh-report-summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:16px}
+.sh-report-summary article{display:grid;gap:8px;padding:17px;border:1px solid #d7e5e9;border-radius:12px;background:#f1f6f8}
+.sh-report-summary article span{color:#718895;font-size:11px}
+.sh-report-summary article strong{color:#194454;font:800 24px Manrope,sans-serif}
+.sh-report-tables{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin-bottom:14px}
+.sh-report-tables .sh-panel{min-width:0}
+.sh-report-status .sh-status-counts{display:flex;gap:10px;flex-wrap:wrap;padding:16px}
+.sh-status-counts>span{display:flex;align-items:center;justify-content:space-between;gap:18px;min-width:135px;padding:10px 12px;border:1px solid #d7e5e9;border-radius:9px;background:#edf4f6;color:#526979;font-size:11px}
+.sh-status-counts strong{color:#194454;font-size:14px}
+@media(max-width:900px){.sh-report-summary{grid-template-columns:repeat(2,minmax(0,1fr))}.sh-report-tables{grid-template-columns:1fr}}
+@media(max-width:520px){.sh-report-summary{gap:8px}.sh-report-summary article{padding:13px}.sh-report-summary article strong{font-size:20px}.sh-report-filters label{flex:1 1 130px}.sh-report-filters button{flex:1}}
 .sh-ticket-actions .sh-icon-action:not(.sh-delete-action):not(.sh-reject-action){background:#e1f1f1;color:#167887}
 .sh-ticket-actions .sh-edit-action{background:#d7eeee;color:#126f78}
 .sh-primary:focus-visible,.sh-secondary-action:focus-visible,.sh-row-action:focus-visible,.sh-mobile-menu:focus-visible{outline:3px solid #27a9a455;outline-offset:2px}

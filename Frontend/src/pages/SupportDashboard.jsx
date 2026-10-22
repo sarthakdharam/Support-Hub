@@ -4,13 +4,12 @@ import { useNavigate } from "react-router-dom"
 import { toast } from "react-toastify"
 import { apiFetch } from "../api"
 import { useLocale } from "../i18n"
-import logo from "../assets/logo.png"
 import "./support-dashboard.css"
 
 const roleLabels = { super_admin: "Super Admin", tech_admin: "Tech Admin", team_member: "Team Member" }
 const menus = {
-    super_admin: ["Dashboard", "Departments", "Tech admins", "Team members", "All tickets", "Ticket history"],
-    tech_admin: ["Dashboard", "All tickets", "Team members", "Departments", "Ticket history"],
+    super_admin: ["Dashboard", "Departments", "Tech admins", "Team members", "All tickets", "Ticket history", "Reports"],
+    tech_admin: ["Dashboard", "All tickets", "Team members", "Departments", "Ticket history", "Reports"],
     team_member: ["Dashboard", "My tickets", "Ticket history"]
 }
 
@@ -90,6 +89,7 @@ function NavIcon({ name }) {
         "My tickets": <><path d="M5 4h14v4a2.5 2.5 0 0 0 0 5v4H5v-4a2.5 2.5 0 0 0 0-5zM12 7v2M12 12v2"/></>,
         "Create ticket": <><circle cx="12" cy="12" r="8.5"/><path d="M12 8v8M8 12h8"/></>,
         "Ticket history": <><circle cx="12" cy="12" r="8.5"/><path d="M12 7v5l3.5 2M4 7V3.5M4 7h3.5"/></>,
+        Reports: <><path d="M4 19.5h16M6.5 16V10m5.5 6V5m5.5 11v-8"/><circle cx="6.5" cy="8" r="1"/><circle cx="12" cy="3.5" r="1"/><circle cx="17.5" cy="6" r="1"/></>,
         "Log out": <><path d="M10 4H5v16h5M14 8l4 4-4 4M8 12h10"/></>
     }[name]
 
@@ -104,6 +104,7 @@ function TicketActionIcon({ name }) {
         close: <><path d="M4 8h16v12H4zM3 5h18v3H3z"/><path d="m9 14 2 2 4-4"/></>,
         edit: <><path d="m4 16.5-.8 4.3 4.3-.8L19 8.5 15.5 5z"/><path d="m13.8 6.7 3.5 3.5"/></>,
         reassign: <><path d="M4 7h13l-3-3m6 13H7l3 3"/><path d="M17 4l3 3-3 3M7 14l-3 3 3 3"/></>,
+        reopen: <><path d="M20 11a8 8 0 0 0-14.8-3L3 11"/><path d="M3 5v6h6M4 13a8 8 0 0 0 14.8 3L21 13"/><path d="M21 19v-6h-6"/></>,
         delete: <><path d="M4 7h16M10 11v6m4-6v6M6 7l1 14h10l1-14M9 7V4h6v3"/></>
     }[name]
 
@@ -398,7 +399,7 @@ function SupportDashboard({ role }) {
                 </>}
                 {section !== "Dashboard" && <section className="sh-panel sh-list-panel"><div className="sh-panel-head"><div><p className="sh-eyebrow">MANAGE YOUR WORK</p><h2>{section}</h2><p>Live information from your SupportHub workspace.</p></div><div className="sh-list-actions">{role === "tech_admin" && section === "All tickets" && <button className="sh-primary" onClick={() => setTicketFormOpen(true)}>＋ Create ticket</button>}{canOpenForm && <button className="sh-primary" onClick={() => formOpen ? closeEntryForm() : setFormOpen(true)}>{formOpen ? "Close form" : section === "My profile" ? "Edit my profile" : `＋ ${section === "Create ticket" ? "New ticket" : section === "Departments" ? "New department" : section === "Tech admins" ? "New tech admin" : "New team member"}`}</button>}</div></div>
                     {formOpen && createPortal(<div className="sh-modal-backdrop" onClick={closeEntryForm}><section className="sh-form-modal" role="dialog" aria-modal="true" aria-labelledby="sh-form-title" onClick={event => event.stopPropagation()}><div className="sh-modal-head"><span className="sh-modal-mark">{section === "My profile" ? "♙" : section === "Create ticket" ? "＋" : section === "Departments" ? "▥" : section === "Tech admins" ? "♙" : "♧"}</span><div><p className="sh-eyebrow">SUPPORTHUB WORKSPACE</p><h3 id="sh-form-title">{section === "My profile" ? "Update your profile" : section === "Create ticket" ? "Create a ticket" : `Create ${section === "Departments" ? "a department" : section === "Tech admins" ? "a tech admin" : "a team member"}`}</h3><p>{section === "My profile" ? "Your account details are yours to manage." : section === "Create ticket" ? "Add the request details and assign it to an available teammate." : "Enter the details below to add this to your workspace."}</p></div><button className="sh-modal-close" type="button" aria-label="Close form" onClick={closeEntryForm}>×</button></div><EntryForm section={section} departments={departments} members={members} profile={profile} fieldErrors={fieldErrors} onClearField={name => setFieldErrors(errors => ({ ...errors, [name]: undefined }))} onSubmit={submitForm} /></section></div>, document.body)}
-                    {!formOpen && (section === "Ticket history" ? <HistoryTable history={history} /> : section === "Departments" ? <SimpleTable headers={["Department", "Responsibilities", "Active members", "Status"]} rows={departments.map(d => [d.dept_name, d.Responsibilities || "—", members.filter(m => m.is_active && m.department?.id === d.id).length, d.is_active ? "Active" : "Inactive"])} records={departments} resource="department" onToggle={updateEntityStatus} /> : section === "Tech admins" ? <SimpleTable headers={["Name", "Username", "Branch", "Team members", "Status"]} rows={admins.map(a => [a.name, a.username, a.branch, a.team_member_count ?? 0, a.is_active ? "Active" : "Inactive"])} records={admins} resource="tech_admin" onToggle={updateEntityStatus} /> : section === "Team members" ? <SimpleTable headers={["Name", "Username", "Department", "Status", "Active tickets"]} rows={members.map(m => [m.name, m.username, m.department?.dept_name || "—", m.is_active ? "Active" : "Inactive", m.active_tickets ?? "—"])} records={members} resource="team_member" onToggle={updateEntityStatus} /> : section === "Create ticket" ? null : <><div className="sh-toolbar"><div className="sh-toolbar-controls"><label className="sh-search">⌕<input value={query} onChange={e => setQuery(e.target.value)} placeholder="Search tickets..." /></label>{section === "All tickets" && <div className="sh-ticket-filters"><CheckboxFilter label="Status" options={["Open", "In Progress", "Resolved", "Closed", "Rejected"].map(value => ({ value, label: value }))} values={statusFilter} onChange={setStatusFilter} open={openFilter === "Status"} onToggle={() => setOpenFilter(current => current === "Status" ? "" : "Status")} /><CheckboxFilter label="Department" options={departments.map(item => ({ value: String(item.id), label: item.dept_name }))} values={departmentFilter} onChange={setDepartmentFilter} open={openFilter === "Department"} onToggle={() => setOpenFilter(current => current === "Department" ? "" : "Department")} /><CheckboxFilter label="Priority" options={["High", "Medium", "Low"].map(value => ({ value, label: value }))} values={priorityFilter} onChange={setPriorityFilter} open={openFilter === "Priority"} onToggle={() => setOpenFilter(current => current === "Priority" ? "" : "Priority")} />{(statusFilter.length || departmentFilter.length || priorityFilter.length) > 0 && <button type="button" className="sh-clear-filters" onClick={() => { setStatusFilter([]); setDepartmentFilter([]); setPriorityFilter([]) }}>Clear filters</button>}</div>}</div><span>{filtered.length} tickets</span></div><TicketTable tickets={rows} role={role} currentUserId={profile?.id} members={members} departments={departments} onAction={updateTicket} /></>)}
+                    {!formOpen && (section === "Reports" ? <ReportsPanel /> : section === "Ticket history" ? <HistoryTable history={history} /> : section === "Departments" ? <SimpleTable headers={["Department", "Responsibilities", "Active members", "Status"]} rows={departments.map(d => [d.dept_name, d.Responsibilities || "—", members.filter(m => m.is_active && m.department?.id === d.id).length, d.is_active ? "Active" : "Inactive"])} records={departments} resource="department" onToggle={updateEntityStatus} /> : section === "Tech admins" ? <SimpleTable headers={["Name", "Username", "Branch", "Team members", "Status"]} rows={admins.map(a => [a.name, a.username, a.branch, a.team_member_count ?? 0, a.is_active ? "Active" : "Inactive"])} records={admins} resource="tech_admin" onToggle={updateEntityStatus} /> : section === "Team members" ? <SimpleTable headers={["Name", "Username", "Department", "Status", "Active tickets"]} rows={members.map(m => [m.name, m.username, m.department?.dept_name || "—", m.is_active ? "Active" : "Inactive", m.active_tickets ?? "—"])} records={members} resource="team_member" onToggle={updateEntityStatus} /> : section === "Create ticket" ? null : <><div className="sh-toolbar"><div className="sh-toolbar-controls"><label className="sh-search">⌕<input value={query} onChange={e => setQuery(e.target.value)} placeholder="Search tickets..." /></label>{section === "All tickets" && <div className="sh-ticket-filters"><CheckboxFilter label="Status" options={["Open", "In Progress", "Resolved", "Closed", "Rejected"].map(value => ({ value, label: value }))} values={statusFilter} onChange={setStatusFilter} open={openFilter === "Status"} onToggle={() => setOpenFilter(current => current === "Status" ? "" : "Status")} /><CheckboxFilter label="Department" options={departments.map(item => ({ value: String(item.id), label: item.dept_name }))} values={departmentFilter} onChange={setDepartmentFilter} open={openFilter === "Department"} onToggle={() => setOpenFilter(current => current === "Department" ? "" : "Department")} /><CheckboxFilter label="Priority" options={["High", "Medium", "Low"].map(value => ({ value, label: value }))} values={priorityFilter} onChange={setPriorityFilter} open={openFilter === "Priority"} onToggle={() => setOpenFilter(current => current === "Priority" ? "" : "Priority")} />{(statusFilter.length || departmentFilter.length || priorityFilter.length) > 0 && <button type="button" className="sh-clear-filters" onClick={() => { setStatusFilter([]); setDepartmentFilter([]); setPriorityFilter([]) }}>Clear filters</button>}</div>}</div><span>{filtered.length} tickets</span></div><TicketTable tickets={rows} role={role} currentUserId={profile?.id} members={members} departments={departments} onAction={updateTicket} /></>)}
                 </section>}
                     {profileEditOpen && createPortal(<div className="sh-modal-backdrop" onClick={() => setProfileEditOpen(false)}><section className="sh-form-modal" role="dialog" aria-modal="true" aria-labelledby="sh-profile-title" onClick={event => event.stopPropagation()}><div className="sh-modal-head"><span className="sh-modal-mark">♙</span><div><p className="sh-eyebrow">YOUR ACCOUNT</p><h3 id="sh-profile-title">Edit your profile</h3><p>Update your personal details and profile photo.</p></div><button className="sh-modal-close" type="button" aria-label="Close profile editor" onClick={() => setProfileEditOpen(false)}>×</button></div><EntryForm section="My profile" departments={departments} members={members} profile={profile} fieldErrors={fieldErrors} onClearField={name => setFieldErrors(errors => ({ ...errors, [name]: undefined }))} onSubmit={event => submitForm(event, "My profile")} /></section></div>, document.body)}
                     {loading && <div className="sh-loading"><span className="sh-spinner"/>Loading workspace…</div>}
@@ -414,6 +415,9 @@ function TicketTable({ tickets, role, currentUserId, members = [], departments =
     const [editTicketId, setEditTicketId] = useState(null)
     const [ticketToDelete, setTicketToDelete] = useState(null)
     const [isDeleting, setIsDeleting] = useState(false)
+    const [ticketToReopen, setTicketToReopen] = useState(null)
+    const [reopenReason, setReopenReason] = useState("")
+    const [isReopening, setIsReopening] = useState(false)
     const [reassignDepartment, setReassignDepartment] = useState("")
     const [page, setPage] = useState(1)
     const pageCount = Math.max(1, Math.ceil(tickets.length / 10))
@@ -448,6 +452,15 @@ function TicketTable({ tickets, role, currentUserId, members = [], departments =
         if (deleted) setTicketToDelete(null)
     }
 
+    async function confirmReopen(event) {
+        event.preventDefault()
+        if (!ticketToReopen || isReopening) return
+        setIsReopening(true)
+        const reopened = await onAction(ticketToReopen, "reopen", { reason: reopenReason.trim() })
+        setIsReopening(false)
+        if (reopened) { setTicketToReopen(null); setReopenReason("") }
+    }
+
     return <><section className="sh-panel sh-ticket-panel">
         <div className="sh-panel-head"><div><h2>Recent tickets</h2><p>Latest requests and their current owners</p></div>{onView && <button className="sh-link" onClick={onView}>View all ↗</button>}</div>
         <div className="sh-table-scroll"><table>
@@ -461,7 +474,7 @@ function TicketTable({ tickets, role, currentUserId, members = [], departments =
                         {role === "team_member" && ticket.status === "Open" ? <div className="sh-ticket-actions"><button type="button" className="sh-row-action sh-icon-action" aria-label="Start work" title="Start work" onClick={() => onAction(ticket, "start_work")}><TicketActionIcon name="start"/></button><button type="button" className="sh-row-action sh-icon-action sh-reject-action" aria-label="Reject ticket" title="Reject ticket" onClick={() => onAction(ticket, "reject")}><TicketActionIcon name="reject"/></button></div>
                             : role === "team_member" && ticket.status === "In Progress" ? <div className="sh-ticket-actions"><button type="button" className="sh-row-action sh-icon-action" aria-label="Resolve ticket" title="Resolve ticket" onClick={() => onAction(ticket, "resolve")}><TicketActionIcon name="resolve"/></button><button type="button" className="sh-row-action sh-icon-action sh-reject-action" aria-label="Reject ticket" title="Reject ticket" onClick={() => onAction(ticket, "reject")}><TicketActionIcon name="reject"/></button></div>
                                 : ["tech_admin", "super_admin"].includes(role) ? <div className="sh-ticket-actions">
-                                    {role === "tech_admin" && ticket.status === "Resolved" && <button type="button" className="sh-row-action sh-icon-action" aria-label="Close ticket" title="Close ticket" onClick={() => onAction(ticket, "close")}><TicketActionIcon name="close"/></button>}
+                                    {role === "tech_admin" && ticket.status === "Resolved" && <><button type="button" className="sh-row-action sh-icon-action" aria-label="Confirm resolution" title="Confirm resolution" onClick={() => onAction(ticket, "close")}><TicketActionIcon name="close"/></button>{ticket.tech_admin?.id === currentUserId && ticket.resolved_at && Date.now() - new Date(ticket.resolved_at).getTime() <= 7 * 24 * 60 * 60 * 1000 && <button type="button" className="sh-row-action sh-icon-action sh-edit-action" aria-label="Reopen ticket" title="Reopen ticket" onClick={() => { setTicketToReopen(ticket); setReopenReason("") }}><TicketActionIcon name="reopen"/></button>}</>}
                                     {role === "tech_admin" && ["Open", "In Progress", "Rejected"].includes(ticket.status) && <><button type="button" className="sh-row-action sh-icon-action sh-edit-action" aria-label="Edit ticket details" title="Edit ticket details" onClick={() => { setEditTicketId(editTicketId === ticket.id ? null : ticket.id); setReassignId(null) }}><TicketActionIcon name="edit"/></button><button type="button" className="sh-row-action sh-icon-action" aria-label="Reassign ticket" title="Reassign ticket" onClick={() => { setReassignId(reassignId === ticket.id ? null : ticket.id); setEditTicketId(null); setReassignDepartment(ticket.department?.id || "") }}><TicketActionIcon name="reassign"/></button></>}
                                     {role === "tech_admin" && ticket.tech_admin?.id === currentUserId && <button type="button" className="sh-row-action sh-icon-action sh-delete-action" aria-label="Delete ticket" title="Delete ticket (Open tickets only)" onClick={() => requestDelete(ticket)}><TicketActionIcon name="delete"/></button>}
                                 </div>
@@ -498,6 +511,7 @@ function TicketTable({ tickets, role, currentUserId, members = [], departments =
             </div>
         </section>
     </div>}
+    {ticketToReopen && <div className="sh-modal-backdrop sh-delete-backdrop" onClick={() => !isReopening && setTicketToReopen(null)}><section className="sh-confirm-modal sh-reopen-modal" role="dialog" aria-modal="true" aria-labelledby="sh-reopen-title" onClick={event => event.stopPropagation()}><span className="sh-confirm-icon"><TicketActionIcon name="reopen"/></span><p className="sh-eyebrow">REOPEN TICKET</p><h3 id="sh-reopen-title">Reopen ticket #{ticketToReopen.ticket_id}?</h3><p>The assigned team member will receive the ticket again. Add a reason so they know what still needs attention.</p><form onSubmit={confirmReopen}><label className="sh-reopen-reason">Reopening reason<textarea value={reopenReason} onChange={event => setReopenReason(event.target.value)} minLength={5} maxLength={1000} required rows={4} placeholder="Describe what is still unresolved…" /></label><div className="sh-confirm-actions"><button type="button" className="sh-cancel-action" disabled={isReopening} onClick={() => setTicketToReopen(null)}>Cancel</button><button type="submit" className="sh-confirm-activate" disabled={isReopening || reopenReason.trim().length < 5}>{isReopening ? "Reopening…" : "Reopen ticket"}</button></div></form></section></div>}
     </>
 }
 function Activity({ history, onView }) { return <section className="sh-panel sh-activity"><div className="sh-panel-head"><div><h2>Recent activity</h2><p>Latest ticket updates</p></div><button className="sh-link" onClick={onView}>View all ↗</button></div><div className="sh-activity-list">{history.length ? history.map((h, i) => <div className="sh-activity-item" key={h.id}><span className={`sh-activity-icon a${i % 4}`}>{h.new_status === "Resolved" ? "✓" : "↻"}</span><div><p><b>{h.changed_by_member?.name || h.changed_by_admin?.username || "Support team"}</b> {h.note || `updated ticket #${h.ticket?.ticket_id}`}</p><small>Ticket #{h.ticket?.ticket_id} · {new Date(h.created_at).toLocaleString()}</small></div></div>) : <p className="sh-empty-text">No recent activity yet.</p>}</div></section> }
@@ -508,6 +522,97 @@ function HistoryTable({ history }) {
     const visibleHistory = history.slice((currentPage - 1) * 10, currentPage * 10)
     return <><div className="sh-table-scroll"><table><thead><tr><th>Ticket</th><th>Update</th><th>Changed by</th><th>Previous status</th><th>New status</th><th>When</th></tr></thead><tbody>{visibleHistory.length ? visibleHistory.map(h => <tr key={h.id}><td className="sh-id">#{h.ticket?.ticket_id}</td><td>{h.note || "Ticket updated"}</td><td>{h.changed_by_member?.name || h.changed_by_admin?.username || "Support team"}</td><td>{h.old_status || "—"}</td><td>{h.new_status || "—"}</td><td>{new Date(h.created_at).toLocaleString()}</td></tr>) : <tr><td colSpan="6" className="sh-empty">No ticket history found.</td></tr>}</tbody></table></div><Pagination page={currentPage} pageCount={pageCount} total={history.length} onChange={setPage} /></>
 }
+
+function ReportsPanel() {
+    const today = new Date()
+    const toDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`
+    const monthStart = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-01`
+    const [from, setFrom] = useState(monthStart)
+    const [to, setTo] = useState(toDate)
+    const [report, setReport] = useState(null)
+    const [loading, setLoading] = useState(false)
+    const [error, setError] = useState("")
+
+    async function loadReport(event) {
+        event?.preventDefault()
+        if (!from || !to || from > to) { setError("Choose a valid date range."); return }
+        setError("")
+        setLoading(true)
+        try {
+            const response = await apiFetch(`reports/tickets?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`)
+            const result = await response.json().catch(() => ({}))
+            if (!response.ok) throw new Error(result.message || "Could not load reports")
+            setReport(result)
+        } catch (loadError) {
+            setError(loadError.message)
+        } finally {
+            setLoading(false)
+        }
+    }
+
+    useEffect(() => { void loadReport() }, [])
+
+    function exportCsv() {
+        if (!report) return
+        const safeCell = value => {
+            let text = String(value ?? "")
+            if (/^[=+@-]/.test(text)) text = `'${text}`
+            return `"${text.replaceAll('"', '""')}"`
+        }
+        const rows = [
+            ["SupportHub Ticket Report", `${report.range.from} to ${report.range.to}`],
+            [],
+            ["Summary", "Value"],
+            ["Total tickets", report.summary.total],
+            ["Resolved or closed", report.summary.resolved],
+            ["Overdue open tickets", report.summary.overdue],
+            ["Average resolution (hours)", report.summary.average_resolution_hours ?? "No resolved tickets"],
+            [],
+            ["Tickets by status", "Count"],
+            ...Object.entries(report.summary.statuses).map(([status, count]) => [status, count]),
+            [],
+            ["Department", "Tickets", "Resolved", "Overdue"],
+            ...report.by_department.map(row => [row.name, row.total, row.resolved, row.overdue]),
+            [],
+            ["Team member", "Department", "Tickets", "Active", "Resolved"],
+            ...report.by_member.map(row => [row.name, row.department, row.total, row.active, row.resolved])
+        ]
+        const csv = `\uFEFF${rows.map(row => row.map(safeCell).join(",")).join("\r\n")}`
+        const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }))
+        const link = document.createElement("a")
+        link.href = url
+        link.download = `supporthub-report-${report.range.from}-to-${report.range.to}.csv`
+        document.body.appendChild(link)
+        link.click()
+        link.remove()
+        URL.revokeObjectURL(url)
+    }
+
+    return <div className="sh-reports">
+        <form className="sh-report-filters" onSubmit={loadReport}>
+            <label>From<input type="date" value={from} max={to} onChange={event => setFrom(event.target.value)} required /></label>
+            <label>To<input type="date" value={to} min={from} onChange={event => setTo(event.target.value)} required /></label>
+            <button className="sh-primary" type="submit" disabled={loading}>{loading ? "Loading…" : "Apply dates"}</button>
+            <button className="sh-report-export" type="button" onClick={exportCsv} disabled={!report}>Export CSV</button>
+        </form>
+        {error && <p className="sh-report-error" role="alert">{error}</p>}
+        {loading && !report ? <p className="sh-empty-text">Loading report…</p> : report && <>
+            <p className="sh-report-range">Report period: <strong>{report.range.from}</strong> to <strong>{report.range.to}</strong></p>
+            <div className="sh-report-summary">
+                <article><span>Total tickets</span><strong>{report.summary.total}</strong></article>
+                <article><span>Resolved or closed</span><strong>{report.summary.resolved}</strong></article>
+                <article><span>Overdue open tickets</span><strong>{report.summary.overdue}</strong></article>
+                <article><span>Average resolution</span><strong>{report.summary.average_resolution_hours == null ? "—" : `${report.summary.average_resolution_hours} hrs`}</strong></article>
+            </div>
+            <div className="sh-report-tables">
+                <section className="sh-panel"><div className="sh-panel-head"><div><h2>Tickets by department</h2><p>Volume, resolved tickets, and overdue count</p></div></div><div className="sh-table-scroll"><table><thead><tr><th>Department</th><th>Tickets</th><th>Resolved</th><th>Overdue</th></tr></thead><tbody>{report.by_department.length ? report.by_department.map(row => <tr key={row.name}><td>{row.name}</td><td>{row.total}</td><td>{row.resolved}</td><td>{row.overdue}</td></tr>) : <tr><td colSpan="4" className="sh-empty">No tickets in this date range.</td></tr>}</tbody></table></div></section>
+                <section className="sh-panel"><div className="sh-panel-head"><div><h2>Workload by team member</h2><p>Assigned ticket count and current workload</p></div></div><div className="sh-table-scroll"><table><thead><tr><th>Team member</th><th>Department</th><th>Total</th><th>Active</th><th>Resolved</th></tr></thead><tbody>{report.by_member.length ? report.by_member.map(row => <tr key={`${row.department}-${row.name}`}><td>{row.name}</td><td>{row.department}</td><td>{row.total}</td><td>{row.active}</td><td>{row.resolved}</td></tr>) : <tr><td colSpan="5" className="sh-empty">No assigned tickets in this date range.</td></tr>}</tbody></table></div></section>
+            </div>
+            <section className="sh-panel sh-report-status"><div className="sh-panel-head"><div><h2>Tickets by status</h2><p>Ticket volume for the selected date range</p></div></div><div className="sh-status-counts">{Object.entries(report.summary.statuses).length ? Object.entries(report.summary.statuses).map(([status, count]) => <span key={status}>{status}<strong>{count}</strong></span>) : <span>No tickets in this date range.</span>}</div></section>
+        </>}
+    </div>
+}
+
 function CheckboxFilter({ label, options, values, onChange, open, onToggle }) {
     return <details className="sh-checkbox-filter" open={open}><summary onClick={event => { event.preventDefault(); onToggle() }}>{label}{values.length > 0 && <span>{values.length}</span>}</summary><div className="sh-checkbox-options">{options.length ? options.map(option => <label key={option.value}><input type="checkbox" checked={values.includes(option.value)} onChange={event => onChange(current => event.target.checked ? [...current, option.value] : current.filter(value => value !== option.value))}/><span>{option.label}</span></label>) : <p>No options available</p>}</div></details>
 }
